@@ -15,6 +15,10 @@ class CanvasRenderer {
         this.ctx.translate(panX, panY);
         this.ctx.scale(zoom, zoom);
 
+        if (this.textSheetMode) {
+             this.ctx.globalAlpha = 0.5;
+        }
+
         this.drawGrid(panX, panY, zoom);
 
         // Rooms
@@ -45,6 +49,11 @@ class CanvasRenderer {
             for (const obj of data.objects) {
                 this.drawObject(obj, obj.id === selectedElementId, zoom);
             }
+        }
+
+        // Reset alpha for labels in Text Sheet Mode so they stand out
+        if (this.textSheetMode) {
+             this.ctx.globalAlpha = 1.0;
         }
 
         // Labels
@@ -305,7 +314,7 @@ class CanvasRenderer {
             const midX = (wall.start.x + wall.end.x) / 2;
             const midY = (wall.start.y + wall.end.y) / 2;
 
-            const offsetDist = 40 / zoom;
+            const offsetDist = 60 / zoom;
 
             let testPx = midX + nx * 5;
             let testPy = midY + ny * 5;
@@ -333,9 +342,13 @@ class CanvasRenderer {
                     }
                 }
                 if (inside2) {
+                    // Both directions are inside rooms (interior wall). Use default.
                     dirX = nx;
                     dirY = ny;
                 }
+            } else {
+                // Not inside on normal, let's verify if negative normal is outside too?
+                // Actually the current logic is to point it OUTSIDE. If 'nx' is outside, we use it.
             }
 
             const p1x = wall.start.x + dirX * offsetDist;

@@ -1,4 +1,32 @@
 class GeometryEngine {
+    static polygonCenter(polygon) {
+        if (!polygon || polygon.length === 0) return {x: 0, y: 0};
+        let cx = 0, cy = 0;
+        let signedArea = 0;
+
+        for (let i = 0; i < polygon.length; i++) {
+            let j = (i + 1) % polygon.length;
+            let a = polygon[i].x * polygon[j].y - polygon[j].x * polygon[i].y;
+            signedArea += a;
+            cx += (polygon[i].x + polygon[j].x) * a;
+            cy += (polygon[i].y + polygon[j].y) * a;
+        }
+
+        signedArea *= 0.5;
+        // If area is 0, just use simple average
+        if (Math.abs(signedArea) < 0.0001) {
+             for (let i = 0; i < polygon.length; i++) {
+                 cx += polygon[i].x;
+                 cy += polygon[i].y;
+             }
+             return {x: cx / polygon.length, y: cy / polygon.length};
+        }
+
+        cx /= (6 * signedArea);
+        cy /= (6 * signedArea);
+        return {x: cx, y: cy};
+    }
+
     static distance(p1, p2) {
         return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
     }
