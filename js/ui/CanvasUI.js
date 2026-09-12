@@ -166,6 +166,10 @@ class CanvasUI {
             this.controller.exportJSON();
         });
 
+        document.getElementById('btn-test-3d').addEventListener('click', () => {
+            window.open('test3d.html', '_blank');
+        });
+
         document.getElementById('btn-export-pdf').addEventListener('click', () => {
              if (window.PDFExporter) {
                  window.PDFExporter.export(this.controller.model, this.canvas);
