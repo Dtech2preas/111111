@@ -412,8 +412,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (obj.type.includes('table') || obj.type.includes('desk')) color = 0x8b5a2b;
                 else if (obj.type.includes('toilet') || obj.type.includes('bath')) color = 0xffffff;
 
+                let isFaulty = false;
+                let faultySeverity = 'warning';
                 if (activeIssues && activeIssues[obj.id]) {
-                    color = 0xff0000; // Bright red for faulty objects
+                    isFaulty = true;
+                    faultySeverity = activeIssues[obj.id].severity;
+                    if (faultySeverity === 'critical') {
+                        color = 0xff0000; // Bright red
+                    } else {
+                        color = 0xffa500; // Orange/Yellow for maintenance
+                    }
                 }
 
                 const objMat = new THREE.MeshLambertMaterial({ color: color });

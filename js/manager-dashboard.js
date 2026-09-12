@@ -28,6 +28,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         residenceNameEl.textContent = resDoc.data().name || `Residence ${residenceId}`;
     }
 
+    // QR Code Generation
+    const btnGenerateQr = document.getElementById('btn-generate-qr');
+    const qrModal = document.getElementById('qr-modal');
+    const btnCloseQr = document.getElementById('btn-close-qr');
+    const qrCodeContainer = document.getElementById('qr-code-container');
+    const qrLinkText = document.getElementById('qr-link-text');
+    let qrCode = null;
+
+    btnGenerateQr.addEventListener('click', () => {
+        qrModal.classList.remove('hidden');
+        qrCodeContainer.innerHTML = ''; // Clear previous
+
+        const currentUrl = new URL(window.location.href);
+        const joinUrl = `${currentUrl.origin}${currentUrl.pathname.replace('manager.html', 'index.html')}?join_residence=${residenceId}`;
+
+        qrCode = new QRCode(qrCodeContainer, {
+            text: joinUrl,
+            width: 200,
+            height: 200,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+
+        qrLinkText.textContent = joinUrl;
+    });
+
+    btnCloseQr.addEventListener('click', () => {
+        qrModal.classList.add('hidden');
+    });
+
+    // Close modal on outside click
+    qrModal.addEventListener('click', (e) => {
+        if (e.target === qrModal) {
+            qrModal.classList.add('hidden');
+        }
+    });
+
     // Listen to Issues/Alerts
     const issuesRef = collection(db, "residences", residenceId, "issues");
     onSnapshot(issuesRef, (snapshot) => {

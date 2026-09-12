@@ -254,8 +254,14 @@ class CanvasRenderer {
         let strokeColor = '#7f8c8d';
 
         if (this.activeIssues && this.activeIssues[obj.id]) {
-            fillColor = 'rgba(231, 76, 60, 0.4)'; // Red tint for issues
-            strokeColor = '#c0392b';
+            const severity = this.activeIssues[obj.id].severity;
+            if (severity === 'critical') {
+                fillColor = 'rgba(231, 76, 60, 0.4)'; // Red tint for critical
+                strokeColor = '#c0392b';
+            } else {
+                fillColor = 'rgba(243, 156, 18, 0.4)'; // Orange/Yellow for maintenance
+                strokeColor = '#d35400';
+            }
         } else if (isSelected) {
             fillColor = 'rgba(52, 152, 219, 0.2)';
             strokeColor = '#2980b9';

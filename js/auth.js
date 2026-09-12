@@ -20,6 +20,22 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentRole = null; // 'student' or 'manager'
     let isLoginMode = true;
 
+    // Check for join_residence parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinResidenceId = urlParams.get('join_residence');
+
+    if (joinResidenceId) {
+        // Automatically switch to sign up as student for the given residence
+        currentRole = 'student';
+        isLoginMode = false;
+        document.getElementById('residence-id').value = joinResidenceId;
+
+        roleSelection.classList.add('hidden');
+        document.getElementById('welcome-text').classList.add('hidden');
+        authSection.classList.remove('hidden');
+        updateAuthUI();
+    }
+
     // Role selection buttons
     document.querySelectorAll('.role-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
