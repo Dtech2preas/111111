@@ -77,6 +77,7 @@ class FloorPlanController extends EventEmitter {
         const loaded = await this.loadLocal();
         if (!loaded) {
             this.model.reset();
+            this.model.emit('change');
 
             // Apply ground floor outline if requested
             if (useGroundOutline && level > 0) {
@@ -208,7 +209,7 @@ class FloorPlanController extends EventEmitter {
         if (residenceId && window.FirebaseStorageManager) {
             return await window.FirebaseStorageManager.saveToFirebase(residenceId, this.model.toJSON(), this.currentFloorLevel);
         }
-        return StorageManager.saveLocal(this.model.toJSON());
+        return StorageManager.saveLocal(this.model.toJSON(), this.currentFloorLevel);
     }
 
     async loadLocal() {
@@ -220,7 +221,7 @@ class FloorPlanController extends EventEmitter {
         }
 
         if (!json) {
-            json = StorageManager.loadLocal();
+            json = StorageManager.loadLocal(this.currentFloorLevel);
         }
 
         if (json) {
