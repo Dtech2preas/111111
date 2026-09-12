@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Appliance Status - D-TECH RES</title>
+    <link rel="stylesheet" href="css/landing.css">
+    <style>
+        .appliance-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .appliance-item {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .appliance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .appliance-title {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .appliance-room {
+            font-size: 12px;
+            color: #666;
+            background: #eee;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .appliance-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .status-select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            flex-grow: 1;
+            min-width: 150px;
+        }
+        .note-input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            flex-grow: 2;
+            min-width: 200px;
+        }
+        .btn-update {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-update:hover {
+            background: #0056b3;
+        }
+        .btn-update.saved {
+            background: #28a745;
+        }
+        .room-group {
+            margin-bottom: 30px;
+        }
+        .room-title {
+            font-size: 18px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <button class="btn-text" onclick="window.location.href='manager.html'">← Back</button>
+            <h1>Appliance Status</h1>
+            <div style="flex-grow: 1"></div>
+        </header>
+
+        <main>
+            <div class="card">
+                <p>Manage the status of appliances across the residence. Changes will alert students immediately.</p>
+                <div id="loading-indicator" style="text-align: center; padding: 20px;">Loading appliances...</div>
+                <div id="appliance-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="js/appliance-status.js"></script>
+</body>
+</html>
