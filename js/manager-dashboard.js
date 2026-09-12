@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         qrCodeContainer.innerHTML = ''; // Clear previous
 
         const currentUrl = new URL(window.location.href);
-        const joinUrl = `${currentUrl.origin}${currentUrl.pathname.replace('manager.html', 'index.html')}?join_residence=${residenceId}`;
+        const joinUrl = `${currentUrl.origin}${currentUrl.pathname.replace('manager.html', 'student.html')}?view_residence=${residenceId}`;
 
         qrCode = new QRCode(qrCodeContainer, {
             text: joinUrl,

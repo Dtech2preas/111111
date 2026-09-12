@@ -37,7 +37,9 @@ class CanvasUI {
 
     checkReadOnly() {
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('readonly') === 'true') {
+        const isGuest = localStorage.getItem('dtech_guest_mode') === 'true';
+        const isStudent = localStorage.getItem('dtech_user_role') === 'student';
+        if (urlParams.get('readonly') === 'true' || isGuest || isStudent) {
             const toolbar = document.querySelector('.toolbar-global');
             if (toolbar) toolbar.style.display = 'none';
 

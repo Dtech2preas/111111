@@ -223,6 +223,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Walk Mode
+    // Readonly Mode (hide inputs for students)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isGuest = localStorage.getItem('dtech_guest_mode') === 'true';
+    const isStudent = localStorage.getItem('dtech_user_role') === 'student';
+    if (urlParams.get('readonly') === 'true' || isGuest || isStudent) {
+        const floorInputs = document.getElementById('floor-inputs');
+        if (floorInputs) {
+            floorInputs.style.display = 'none';
+        }
+    }
+
     const walkBtn = document.getElementById('btn-walk-mode');
     const walkInstr = document.getElementById('walk-instructions');
 
