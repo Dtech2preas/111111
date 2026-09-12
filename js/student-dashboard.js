@@ -4,8 +4,20 @@ import { doc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/fir
 import { signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Check if accessing via guest view (QR Code)
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewResidenceId = urlParams.get('view_residence');
+    if (viewResidenceId) {
+        localStorage.setItem('dtech_residence_id', viewResidenceId);
+        localStorage.setItem('dtech_user_role', 'student');
+        localStorage.setItem('dtech_guest_mode', 'true');
+        // Clean URL to not show parameter continuously if desired,
+        // but leaving it is fine too for bookmarking.
+    }
+
     const residenceId = localStorage.getItem('dtech_residence_id');
     const role = localStorage.getItem('dtech_user_role');
+    const isGuest = localStorage.getItem('dtech_guest_mode') === 'true';
 
     if (!residenceId || role !== 'student') {
         window.location.href = 'index.html'; // Redirect unauthorized
@@ -17,7 +29,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnLogout = document.getElementById('btn-logout');
 
     btnLogout.addEventListener('click', async () => {
-        await signOut(auth);
+        if (!isGuest) {
+            try {
+                await signOut(auth);
+            } catch (e) {
+                console.warn('Sign out error:', e);
+            }
+        }
         localStorage.clear();
         window.location.href = 'index.html';
     });
