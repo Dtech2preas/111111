@@ -59,6 +59,9 @@ class CanvasRenderer {
             this.drawSnapIndicator(snapPoint, zoom);
         }
 
+        // Dimensions
+        this.drawDimensions(zoom);
+
         // Measurement
         if (measurement && measurement.active && measurement.startPoint && measurement.endPoint) {
             this.drawMeasurement(measurement, data.scale, zoom);
@@ -275,5 +278,116 @@ class CanvasRenderer {
         this.ctx.font = `bold ${14/zoom}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.fillText(`${dist.toFixed(2)}m`, (meas.startPoint.x + meas.endPoint.x)/2, (meas.startPoint.y + meas.endPoint.y)/2 - 10/zoom);
+    }
+
+    drawDimensions(zoom) {
+        if (!document.getElementById('check-show-dimensions')?.checked) return;
+
+        const walls = this.model.data.walls;
+        const rooms = this.model.data.rooms;
+
+        this.ctx.lineWidth = 1 / zoom;
+        this.ctx.strokeStyle = '#34495e';
+        this.ctx.fillStyle = '#34495e';
+        this.ctx.font = `${12/zoom}px Arial`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+
+        for (const wall of walls) {
+            const dx = wall.end.x - wall.start.x;
+            const dy = wall.end.y - wall.start.y;
+            const length = Math.sqrt(dx*dx + dy*dy);
+            if (length === 0) continue;
+
+            const nx = -dy / length;
+            const ny = dx / length;
+
+            const midX = (wall.start.x + wall.end.x) / 2;
+            const midY = (wall.start.y + wall.end.y) / 2;
+
+            const offsetDist = 40 / zoom;
+
+            let testPx = midX + nx * 5;
+            let testPy = midY + ny * 5;
+
+            let inside = false;
+            for (const room of rooms) {
+                if (GeometryEngine.pointInPolygon({x: testPx, y: testPy}, room.boundary)) {
+                    inside = true;
+                    break;
+                }
+            }
+
+            let dirX = nx;
+            let dirY = ny;
+            if (inside) {
+                dirX = -nx;
+                dirY = -ny;
+                let testPx2 = midX + dirX * 5;
+                let testPy2 = midY + dirY * 5;
+                let inside2 = false;
+                for (const room of rooms) {
+                    if (GeometryEngine.pointInPolygon({x: testPx2, y: testPy2}, room.boundary)) {
+                        inside2 = true;
+                        break;
+                    }
+                }
+                if (inside2) {
+                    dirX = nx;
+                    dirY = ny;
+                }
+            }
+
+            const p1x = wall.start.x + dirX * offsetDist;
+            const p1y = wall.start.y + dirY * offsetDist;
+            const p2x = wall.end.x + dirX * offsetDist;
+            const p2y = wall.end.y + dirY * offsetDist;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(wall.start.x + dirX * (wall.thickness/2 + 2), wall.start.y + dirY * (wall.thickness/2 + 2));
+            this.ctx.lineTo(p1x + dirX * (10/zoom), p1y + dirY * (10/zoom));
+            this.ctx.stroke();
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(wall.end.x + dirX * (wall.thickness/2 + 2), wall.end.y + dirY * (wall.thickness/2 + 2));
+            this.ctx.lineTo(p2x + dirX * (10/zoom), p2y + dirY * (10/zoom));
+            this.ctx.stroke();
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(p1x, p1y);
+            this.ctx.lineTo(p2x, p2y);
+            this.ctx.stroke();
+
+            const tickSize = 5 / zoom;
+            const tickDx = -ny * tickSize;
+            const tickDy = nx * tickSize;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(p1x - tickDx - dirX*tickSize, p1y - tickDy - dirY*tickSize);
+            this.ctx.lineTo(p1x + tickDx + dirX*tickSize, p1y + tickDy + dirY*tickSize);
+            this.ctx.stroke();
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(p2x - tickDx - dirX*tickSize, p2y - tickDy - dirY*tickSize);
+            this.ctx.lineTo(p2x + tickDx + dirX*tickSize, p2y + tickDy + dirY*tickSize);
+            this.ctx.stroke();
+
+            const distMeters = (length * this.model.data.scale).toFixed(2);
+            let angle = Math.atan2(dy, dx);
+            if (angle > Math.PI/2 || angle < -Math.PI/2) {
+                angle += Math.PI;
+            }
+
+            this.ctx.save();
+            this.ctx.translate(midX + dirX * (offsetDist + 10/zoom), midY + dirY * (offsetDist + 10/zoom));
+            this.ctx.rotate(angle);
+            const txt = `${distMeters}m`;
+            const tm = this.ctx.measureText(txt);
+            this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            this.ctx.fillRect(-tm.width/2 - 2, -8/zoom, tm.width + 4, 16/zoom);
+            this.ctx.fillStyle = '#34495e';
+            this.ctx.fillText(txt, 0, 0);
+            this.ctx.restore();
+        }
     }
 }

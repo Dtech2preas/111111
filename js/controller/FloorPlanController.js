@@ -98,7 +98,22 @@ class FloorPlanController extends EventEmitter {
                 };
             });
         }
+
+        // Update objects room assignment
+        if (this.model.data.objects) {
+            this.model.data.objects.forEach(obj => {
+                let foundRoom = null;
+                for (const room of this.model.data.rooms) {
+                    if (GeometryEngine.pointInPolygon(obj.position, room.boundary)) {
+                        foundRoom = room.name; // Use name for easy UI display
+                        break;
+                    }
+                }
+                obj.roomName = foundRoom || "None";
+            });
+        }
     }
+
 
     // --- History Proxy ---
     undo() {
