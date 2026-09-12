@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-TECH Residence Floor Plan System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Third-party library for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>D-TECH Residence Floor Plan System</h1>
+            <div class="toolbar-global">
+                <button id="btn-new">New</button>
+                <button id="btn-save">Save (Local)</button>
+                <button id="btn-load">Load (Local)</button>
+                <button id="btn-import">Import JSON</button>
+                <button id="btn-export-json">Export JSON</button>
+                <button id="btn-export-pdf">Export PDF</button>
+                <span class="separator">|</span>
+                <button id="btn-undo" disabled>Undo</button>
+                <button id="btn-redo" disabled>Redo</button>
+            </div>
+        </header>
+        <main>
+            <aside class="sidebar-left">
+                <h3>Tools</h3>
+                <div class="tool-group">
+                    <button class="tool-btn active" data-tool="select">Select / Move</button>
+                    <button class="tool-btn" data-tool="wall">Draw Wall</button>
+                    <button class="tool-btn" data-tool="door">Add Door</button>
+                    <button class="tool-btn" data-tool="window">Add Window</button>
+                    <button class="tool-btn" data-tool="room">Edit Room</button>
+                    <button class="tool-btn" data-tool="delete">Delete Element</button>
+                </div>
+                <h3>Properties</h3>
+                <div id="properties-panel">
+                    <p class="placeholder-text">Select an element to view properties</p>
+                </div>
+                <h3>Settings</h3>
+                <div class="settings-group">
+                    <label>
+                        Scale (1 unit = x meters):
+                        <input type="number" id="input-scale" value="0.01" step="0.01">
+                    </label>
+                </div>
+            </aside>
+            <div class="canvas-container">
+                <canvas id="floorplan-canvas"></canvas>
+            </div>
+            <aside class="sidebar-right">
+                <h3>Rooms</h3>
+                <div id="rooms-list">
+                    <p class="placeholder-text">No rooms detected</p>
+                </div>
+            </aside>
+        </main>
+        <footer>
+            <div id="status-bar">Ready</div>
+            <div id="coordinates">X: 0, Y: 0</div>
+            <div id="zoom-controls">
+                <button id="btn-zoom-out">-</button>
+                <span id="zoom-level">100%</span>
+                <button id="btn-zoom-in">+</button>
+                <button id="btn-zoom-reset">Reset</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils/EventEmitter.js"></script>
+    <script src="js/model/FloorPlanModel.js"></script>
+    <script src="js/geometry/GeometryEngine.js"></script>
+    <script src="js/controller/FloorPlanController.js"></script>
+    <script src="js/ui/CanvasUI.js"></script>
+    <script src="js/export/PDFExporter.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
