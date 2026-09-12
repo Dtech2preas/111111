@@ -151,22 +151,56 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeIssues = {};
     let latestFloorData = null;
 
+
+
     setTimeout(() => {
         const residenceId = localStorage.getItem('dtech_residence_id');
         if (residenceId && window.FirebaseStorageManager) {
+            // First load all existing floors
+            window.FirebaseStorageManager.getAllFloors(residenceId).then(floors => {
+                // Determine max floor
+                const floorLevels = Object.keys(floors).map(Number).sort((a,b)=>a-b);
+                const maxFloor = floorLevels.length > 0 ? floorLevels[floorLevels.length - 1] : 0;
 
-            // Listen to floor plan changes
-            window.FirebaseStorageManager.listenToFloorPlan(residenceId, (data) => {
-                latestFloorData = data;
-                buildFloor(data, targetFloorLevel);
+                // Build all floors up to maxFloor
+                for(let i=0; i<=maxFloor; i++) {
+                    if (floors[i]) {
+                        buildFloor(floors[i], i);
+                    }
+                }
+
+                if (floorLevels.length === 0) {
+                     // Fallback
+                     const localData = localStorage.getItem('dtech_floorplan_v2');
+                     if (localData) {
+                         latestFloorData = JSON.parse(localData);
+                         buildFloor(latestFloorData, targetFloorLevel);
+                     }
+                }
+
+                // Now setup listeners for changes (simple approach: just listen to current target floor for updates)
+                window.FirebaseStorageManager.listenToFloorPlan(residenceId, targetFloorLevel, (data) => {
+                    latestFloorData = data;
+                    buildFloor(data, targetFloorLevel);
+                });
+            }).catch(e => {
+                // local fallback if network error
+                const localData = localStorage.getItem('dtech_floorplan_v2');
+                if (localData) {
+                    latestFloorData = JSON.parse(localData);
+                    buildFloor(latestFloorData, targetFloorLevel);
+                }
             });
 
             // Listen to issue changes
             window.FirebaseStorageManager.listenToIssues(residenceId, (issues) => {
                 activeIssues = issues;
-                if (latestFloorData) {
-                    buildFloor(latestFloorData, targetFloorLevel); // rebuild to apply red materials
-                }
+                // Rebuild all to show issues
+                window.FirebaseStorageManager.getAllFloors(residenceId).then(floors => {
+                    Object.keys(floors).forEach(level => {
+                        buildFloor(floors[level], parseInt(level));
+                    });
+                });
             });
         } else {
             // Load from local storage fallback
@@ -178,6 +212,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 500);
 
+
+
+
     // UI Listeners
     const targetFloorDisplay = document.getElementById('target-floor-display');
 
@@ -185,14 +222,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetFloorLevel > 0) {
             targetFloorLevel--;
             targetFloorDisplay.innerText = targetFloorLevel;
+            // Move camera
+            const p = camera.position;
+            orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
+            orbitControls.update();
         }
     });
 
     document.getElementById('btn-increase-floor').addEventListener('click', () => {
         targetFloorLevel++;
         targetFloorDisplay.innerText = targetFloorLevel;
+        // Move camera
+        const p = camera.position;
+        orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
+        orbitControls.update();
     });
-
     document.getElementById('json-upload').addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -261,14 +305,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Building the 3D model
+
+    // Floor groups dictionary
+    const floorGroups = {};
+
     function buildFloor(data, level) {
         if (!data || !data.walls) return;
 
-        // Clear existing walls for this floor? For now, we just clear everything.
-        while(wallsGroup.children.length > 0){
-            wallsGroup.remove(wallsGroup.children[0]);
+        // Clear existing walls for this floor
+        if (floorGroups[level]) {
+            wallsGroup.remove(floorGroups[level]);
         }
-        wallsMaterials = [];
+
+        const currentFloorGroup = new THREE.Group();
+        floorGroups[level] = currentFloorGroup;
+        wallsGroup.add(currentFloorGroup);
+
+        wallsMaterials = []; // Note: this will overwrite for all floors, but fine for toggle
 
         const yOffset = level * floorHeight;
 
@@ -305,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 roomMesh.rotation.x = Math.PI / 2; // Lay flat
                 roomMesh.position.y = yOffset;
                 roomMesh.receiveShadow = true;
-                wallsGroup.add(roomMesh);
+                currentFloorGroup.add(roomMesh);
             });
         } else {
             // Base floor if no rooms
@@ -315,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
             floorPlane.rotation.x = -Math.PI / 2;
             floorPlane.position.set(canvasW / 2, yOffset, canvasH / 2);
             floorPlane.receiveShadow = true;
-            wallsGroup.add(floorPlane);
+            currentFloorGroup.add(floorPlane);
         }
 
         const wallMaterial = new THREE.MeshLambertMaterial({ color: 0xe0e0e0 });
@@ -356,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
             wallMesh.castShadow = true;
             wallMesh.receiveShadow = true;
 
-            wallsGroup.add(wallMesh);
+            currentFloorGroup.add(wallMesh);
         });
 
         // Add Doors
@@ -377,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 doorMesh.rotation.y = -angle + Math.PI / 4; // Open by 45 degrees
 
                 doorMesh.castShadow = true;
-                wallsGroup.add(doorMesh);
+                currentFloorGroup.add(doorMesh);
             });
         }
 
@@ -405,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const angle = win.rotation ? win.rotation : 0;
                 winMesh.rotation.y = -angle;
 
-                wallsGroup.add(winMesh);
+                currentFloorGroup.add(winMesh);
             });
         }
 
@@ -447,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 objMesh.castShadow = true;
                 objMesh.receiveShadow = true;
-                wallsGroup.add(objMesh);
+                currentFloorGroup.add(objMesh);
             });
         }
 
@@ -459,4 +512,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log(`Floor ${level} generated.`);
     }
+
 });

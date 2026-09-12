@@ -14,41 +14,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loading = document.getElementById('loading-indicator');
 
     try {
-        // 1. Fetch floor plan data to extract appliances and rooms
-        const planRef = doc(db, "residences", residenceId, "floorPlans", "main");
-        const planSnap = await getDoc(planRef);
 
-        let floorPlanData = null;
-        if (planSnap.exists()) {
-            floorPlanData = planSnap.data().data;
-        }
+        // 1. Fetch floor plan data from ALL floors
+        const { FirebaseStorageManager } = await import('./managers/FirebaseStorageManager.js');
+        const floorsData = await FirebaseStorageManager.getAllFloors(residenceId);
 
-        if (!floorPlanData || !floorPlanData.objects || floorPlanData.objects.length === 0) {
-            loading.textContent = "No appliances found in the floor plan. Please add some in the editor.";
-            return;
-        }
-
-        // Filter for appliance-like objects
+        let allAppliances = [];
         const applianceTypes = ['stove', 'fridge', 'sink', 'tv', 'shower', 'bath', 'toilet', 'washing_machine', 'microwave'];
-        const appliances = floorPlanData.objects.filter(obj => applianceTypes.includes(obj.type));
-
-        if (appliances.length === 0) {
-            loading.textContent = "No appliances found. Add stoves, fridges, etc. in the editor.";
-            return;
-        }
-
-        // 2. Fetch current issues to pre-fill statuses
-        const issuesRef = collection(db, "residences", residenceId, "issues");
-        const issuesSnap = await getDocs(issuesRef);
-        const currentIssues = {};
-        issuesSnap.forEach(doc => {
-            currentIssues[doc.id] = doc.data();
-        });
-
-        // 3. Group by room (basic geometric check or fallback)
-        // For simplicity, if room logic is complex, we just list them all under "All Appliances"
-        // but let's try to match them to rooms if they fall inside a room's bounding box.
-        const rooms = floorPlanData.rooms || [];
 
         const isPointInPolygon = (point, vs) => {
             let x = point.x, y = point.y;
@@ -63,24 +35,53 @@ document.addEventListener('DOMContentLoaded', async () => {
             return inside;
         };
 
+        for (const [floorLevel, data] of Object.entries(floorsData)) {
+            if (data && data.objects) {
+                const apps = data.objects.filter(obj => applianceTypes.includes(obj.type));
+                const rooms = data.rooms || [];
+
+                apps.forEach(app => {
+                    app.floorLevel = floorLevel;
+                    let roomName = "Unassigned Area";
+                    for (const room of rooms) {
+                        if (room.boundary && isPointInPolygon(app.position, room.boundary)) {
+                            roomName = room.name || room.type || "Room";
+                            break;
+                        }
+                    }
+                    app.roomName = roomName;
+                    allAppliances.push(app);
+                });
+            }
+        }
+
+        if (allAppliances.length === 0) {
+            loading.textContent = "No appliances found on any floor. Add stoves, fridges, etc. in the editor.";
+            return;
+        }
+
+        // 2. Fetch current issues to pre-fill statuses
+
+        const issuesRef = collection(db, "residences", residenceId, "issues");
+        const issuesSnap = await getDocs(issuesRef);
+
+        const currentIssues = {};
+        issuesSnap.forEach(doc => {
+            currentIssues[doc.id] = doc.data();
+        });
+
+        // 3. Group by Floor and Room
         const groupedAppliances = {};
-
-        appliances.forEach(app => {
-            let roomName = "Unassigned Area";
-            for (const room of rooms) {
-                if (room.boundary && isPointInPolygon(app.position, room.boundary)) {
-                    roomName = room.name || room.type || "Room";
-                    break;
-                }
+        allAppliances.forEach(app => {
+            const groupKey = `Floor ${app.floorLevel} - ${app.roomName}`;
+            if (!groupedAppliances[groupKey]) {
+                groupedAppliances[groupKey] = [];
             }
-
-            if (!groupedAppliances[roomName]) {
-                groupedAppliances[roomName] = [];
-            }
-            groupedAppliances[roomName].push(app);
+            groupedAppliances[groupKey].push(app);
         });
 
         // 4. Render UI
+
         loading.style.display = 'none';
 
         for (const [roomName, apps] of Object.entries(groupedAppliances)) {
@@ -140,6 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 // Remove issue
                                 await deleteDoc(issueRef);
                             } else {
+
                                 // Add/Update issue
                                 await setDoc(issueRef, {
                                     elementId: app.id,
@@ -147,8 +149,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     description: newNote || `Appliance is ${newStatus.replace('_', ' ')}`,
                                     severity: newStatus === 'not_working' ? 'critical' : 'warning',
                                     status: newStatus,
+                                    floorLevel: app.floorLevel,
+                                    roomName: app.roomName,
                                     timestamp: new Date().toISOString()
                                 });
+
                             }
 
                             btn.textContent = 'Saved!';
