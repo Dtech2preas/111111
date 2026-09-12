@@ -31,7 +31,28 @@ class CanvasUI {
         this.initCanvas();
         this.bindEvents();
         this.bindDOM();
+        this.checkReadOnly();
         this.render();
+    }
+
+    checkReadOnly() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('readonly') === 'true') {
+            const toolbar = document.querySelector('.toolbar-global');
+            if (toolbar) toolbar.style.display = 'none';
+
+            const sidebarLeft = document.getElementById('sidebar-left');
+            if (sidebarLeft) sidebarLeft.style.display = 'none';
+
+            const sidebarRight = document.getElementById('sidebar-right');
+            if (sidebarRight) sidebarRight.style.display = 'none';
+
+            // Reset tools
+            this.controller.setTool('select');
+
+            // Re-adjust canvas width since sidebars are gone
+            setTimeout(() => this.resize(), 100);
+        }
     }
 
     initCanvas() {
@@ -149,15 +170,19 @@ class CanvasUI {
             }
         });
 
-        document.getElementById('btn-save').addEventListener('click', () => {
-            if (this.controller.saveLocal()) {
-                this.showStatus("Saved to local storage");
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            const success = await this.controller.saveLocal();
+            if (success) {
+                this.showStatus("Saved to database");
+            } else {
+                this.showStatus("Failed to save. Check connection.");
             }
         });
 
-        document.getElementById('btn-load').addEventListener('click', () => {
-            if (this.controller.loadLocal()) {
-                this.showStatus("Loaded from local storage");
+        document.getElementById('btn-load').addEventListener('click', async () => {
+            const success = await this.controller.loadLocal();
+            if (success) {
+                this.showStatus("Loaded from database");
                 this.render(); // force render
             }
         });
@@ -794,7 +819,7 @@ class CanvasUI {
             measurement: this.controller.measurementEngine,
             snapPoint: this.snapPoint
         };
-        this.renderer.render(state);
+        this.renderer.render(state, this.controller.activeIssues || {});
         this.updateRoomsList();
     }
 
@@ -851,6 +876,68 @@ class CanvasUI {
         } else if (el.type === 'label') {
             this.createInputRow(panel, 'Text', el.text, (val) => this.updateProp(el.id, {text: val}));
             this.createInputRow(panel, 'Font Size', el.fontSize, (val) => this.updateProp(el.id, {fontSize: parseInt(val)}), false, 'number');
+        }
+
+        // --- Manager Issue Controls ---
+        const userRole = localStorage.getItem('dtech_user_role');
+        const residenceId = localStorage.getItem('dtech_residence_id');
+
+        if (userRole === 'manager' && residenceId) {
+            const issueSection = document.createElement('div');
+            issueSection.style.marginTop = '20px';
+            issueSection.style.paddingTop = '10px';
+            issueSection.style.borderTop = '1px solid #ccc';
+            issueSection.innerHTML = `<h4>Status</h4>`;
+
+            const isFaulty = this.controller.activeIssues && this.controller.activeIssues[el.id];
+
+            if (isFaulty) {
+                issueSection.innerHTML += `<div style="color: red; margin-bottom: 10px;">🔴 Not Working</div>
+                                           <p style="font-size: 12px; margin-top: 0;">Problem: ${this.controller.activeIssues[el.id].description}</p>`;
+
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'btn-text';
+                clearBtn.style.padding = '0';
+                clearBtn.textContent = 'Mark as Operational';
+                clearBtn.onclick = () => {
+                    window.FirebaseStorageManager.clearIssue(residenceId, el.id);
+                };
+                issueSection.appendChild(clearBtn);
+            } else {
+                issueSection.innerHTML += `<div style="color: green; margin-bottom: 10px;">🟢 Working</div>`;
+
+                const faultInput = document.createElement('input');
+                faultInput.type = 'text';
+                faultInput.placeholder = 'Describe problem...';
+                faultInput.style.width = '100%';
+                faultInput.style.padding = '8px';
+                faultInput.style.marginBottom = '10px';
+                faultInput.style.boxSizing = 'border-box';
+                faultInput.style.border = '1px solid #ccc';
+                faultInput.style.borderRadius = '4px';
+
+                const markBtn = document.createElement('button');
+                markBtn.style.backgroundColor = '#dc3545';
+                markBtn.style.color = 'white';
+                markBtn.style.border = 'none';
+                markBtn.style.padding = '8px 12px';
+                markBtn.style.borderRadius = '4px';
+                markBtn.style.cursor = 'pointer';
+                markBtn.style.width = '100%';
+                markBtn.textContent = 'Mark as Faulty';
+                markBtn.onclick = () => {
+                    if (faultInput.value.trim() === '') {
+                        alert("Please provide a description.");
+                        return;
+                    }
+                    const elName = el.name || (el.type === 'object' ? ObjectManager.getObjectDefinition(el.category, el.objType).name : el.type);
+                    window.FirebaseStorageManager.markIssue(residenceId, el.id, elName, faultInput.value);
+                };
+
+                issueSection.appendChild(faultInput);
+                issueSection.appendChild(markBtn);
+            }
+            panel.appendChild(issueSection);
         }
     }
 

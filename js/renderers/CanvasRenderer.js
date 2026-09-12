@@ -5,9 +5,10 @@ class CanvasRenderer {
         this.model = model;
     }
 
-    render(state) {
+    render(state, activeIssues = {}) {
         const { panX, panY, zoom, currentTool, tempWallStart, currentMousePos, selectedElementId, measurement, snapPoint } = state;
         const data = this.model.data;
+        this.activeIssues = activeIssues;
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -162,7 +163,14 @@ class CanvasRenderer {
         }
         this.ctx.closePath();
 
-        this.ctx.fillStyle = isSelected ? 'rgba(52, 152, 219, 0.3)' : 'rgba(236, 240, 241, 0.6)';
+        let fillColor = 'rgba(236, 240, 241, 0.6)';
+        if (this.activeIssues && this.activeIssues[room.id]) {
+            fillColor = 'rgba(231, 76, 60, 0.4)'; // Red tint for issues
+        } else if (isSelected) {
+            fillColor = 'rgba(52, 152, 219, 0.3)';
+        }
+
+        this.ctx.fillStyle = fillColor;
         this.ctx.fill();
 
         if (isSelected) {
@@ -242,8 +250,19 @@ class CanvasRenderer {
         this.ctx.translate(obj.position.x, obj.position.y);
         this.ctx.rotate(obj.rotation || 0);
 
-        this.ctx.fillStyle = isSelected ? 'rgba(52, 152, 219, 0.2)' : 'rgba(149, 165, 166, 0.2)';
-        this.ctx.strokeStyle = isSelected ? '#2980b9' : '#7f8c8d';
+        let fillColor = 'rgba(149, 165, 166, 0.2)';
+        let strokeColor = '#7f8c8d';
+
+        if (this.activeIssues && this.activeIssues[obj.id]) {
+            fillColor = 'rgba(231, 76, 60, 0.4)'; // Red tint for issues
+            strokeColor = '#c0392b';
+        } else if (isSelected) {
+            fillColor = 'rgba(52, 152, 219, 0.2)';
+            strokeColor = '#2980b9';
+        }
+
+        this.ctx.fillStyle = fillColor;
+        this.ctx.strokeStyle = strokeColor;
         this.ctx.lineWidth = 2 / zoom;
 
         this.ctx.fillRect(-obj.width/2, -obj.height/2, obj.width, obj.height);

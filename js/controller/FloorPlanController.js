@@ -13,6 +13,10 @@ class FloorPlanController extends EventEmitter {
         this.selectedElementId = null;
         this.currentObjectType = null; // For furniture tool
 
+        // Alerts / Issues
+        this.activeIssues = {};
+        this.setupIssueListener();
+
         this.historyEngine.saveState(this.model.data);
 
         // Listen for model changes to update rooms and save history
@@ -24,6 +28,22 @@ class FloorPlanController extends EventEmitter {
         this.historyEngine.on('history_changed', (state) => {
             this.emit('history_changed', state);
         });
+    }
+
+    setupIssueListener() {
+        const residenceId = localStorage.getItem('dtech_residence_id');
+
+        // Wait a small tick to ensure Firebase is loaded
+        setTimeout(() => {
+            if (residenceId && window.FirebaseStorageManager) {
+                window.FirebaseStorageManager.listenToIssues(residenceId, (issues) => {
+                    this.activeIssues = issues;
+                    this.emit('issuesUpdated');
+                    this.emit('needsRender'); // CanvasUI listens for 'model_changed' or calls render on events, we'll emit 'model_changed' just in case.
+                    this.emit('model_changed');
+                });
+            }
+        }, 500);
     }
 
     setTool(toolName) {
@@ -137,12 +157,26 @@ class FloorPlanController extends EventEmitter {
     }
 
     // --- Storage ---
-    saveLocal() {
+    async saveLocal() {
+        const residenceId = localStorage.getItem('dtech_residence_id');
+        if (residenceId && window.FirebaseStorageManager) {
+            return await window.FirebaseStorageManager.saveToFirebase(residenceId, this.model.toJSON());
+        }
         return StorageManager.saveLocal(this.model.toJSON());
     }
 
-    loadLocal() {
-        const json = StorageManager.loadLocal();
+    async loadLocal() {
+        const residenceId = localStorage.getItem('dtech_residence_id');
+        let json = null;
+
+        if (residenceId && window.FirebaseStorageManager) {
+            json = await window.FirebaseStorageManager.loadFromFirebase(residenceId);
+        }
+
+        if (!json) {
+            json = StorageManager.loadLocal();
+        }
+
         if (json) {
             const success = this.model.load(json);
             if (success) {
