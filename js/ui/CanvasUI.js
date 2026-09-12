@@ -4,6 +4,7 @@ class CanvasUI {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.container = this.canvas.parentElement;
+        this.renderer = new CanvasRenderer(this.ctx, this.canvas, this.controller.model);
 
         // Viewport state
         this.zoom = 1;
@@ -16,9 +17,16 @@ class CanvasUI {
         this.lastMouseX = 0;
         this.lastMouseY = 0;
 
+        // Touch interaction specifics
+        this.lastPinchDist = null;
+        this.lastTouchCenter = null;
+        this.touchTapTimeout = null;
+
         // Drawing state
         this.tempWallStart = null;
         this.currentMousePos = null;
+        this.snapPoint = null;
+        this.activeHandle = null;
 
         this.initCanvas();
         this.bindEvents();
@@ -29,7 +37,6 @@ class CanvasUI {
     initCanvas() {
         this.resize();
         window.addEventListener('resize', () => this.resize());
-        // Center pan initially
         this.panX = this.canvas.width / 2;
         this.panY = this.canvas.height / 2;
     }
@@ -43,8 +50,16 @@ class CanvasUI {
 
     getMousePos(e) {
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        }
+
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
         return {
             x: (x - this.panX) / this.zoom,
             y: (y - this.panY) / this.zoom
@@ -52,29 +67,62 @@ class CanvasUI {
     }
 
     bindEvents() {
+        // Mouse Events
         this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
-        this.canvas.addEventListener('wheel', this.onWheel.bind(this));
+        this.canvas.addEventListener('mouseleave', this.onMouseUp.bind(this));
+        this.canvas.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
+
+        // Touch Events
+        this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
+        this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
+        this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this));
+        this.canvas.addEventListener('touchcancel', this.onTouchEnd.bind(this));
 
         this.controller.on('model_changed', () => this.render());
         this.controller.on('selection_changed', () => this.updatePropertiesPanel());
+        this.controller.on('tool_changed', (tool) => {
+            this.tempWallStart = null;
+            this.currentMousePos = null;
+            this.snapPoint = null;
+            if(tool === 'measurement') {
+                this.controller.measurementEngine.active = false;
+            }
+            this.render();
+
+            // UI Palette toggles
+            const palette = document.getElementById('object-palette');
+            if(tool === 'object') {
+                palette.classList.remove('hidden');
+            } else {
+                palette.classList.add('hidden');
+            }
+        });
     }
 
     bindDOM() {
         // Tools
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                const btnEl = e.currentTarget;
                 document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
+                btnEl.classList.add('active');
 
-                const tool = e.target.dataset.tool;
+                const tool = btnEl.dataset.tool;
                 if (tool === 'delete') {
                     this.controller.deleteSelected();
-                    // Don't keep delete active, revert to select
                     setTimeout(() => {
                         document.querySelector('[data-tool="select"]').click();
                     }, 100);
+                } else if (tool === 'label') {
+                    this.controller.setTool('label');
+                    const text = prompt("Enter label text:");
+                    if (text && this.currentMousePos) {
+                        this.controller.model.addLabel(text, this.currentMousePos);
+                        this.controller.commitAction();
+                    }
+                    setTimeout(() => document.querySelector('[data-tool="select"]').click(), 100);
                 } else {
                     this.controller.setTool(tool);
                 }
@@ -85,9 +133,8 @@ class CanvasUI {
         document.getElementById('btn-new').addEventListener('click', () => {
             if(confirm("Create new plan? Unsaved changes will be lost.")) {
                 this.controller.model.reset();
-                this.controller.history = [];
-                this.controller.historyIndex = -1;
-                this.controller.saveState();
+                this.controller.historyEngine.clear();
+                this.controller.historyEngine.saveState(this.controller.model.data);
                 this.panX = this.canvas.width / 2;
                 this.panY = this.canvas.height / 2;
                 this.zoom = 1;
@@ -97,15 +144,14 @@ class CanvasUI {
 
         document.getElementById('btn-save').addEventListener('click', () => {
             if (this.controller.saveLocal()) {
-                document.getElementById('status-bar').innerText = "Saved to local storage.";
-                setTimeout(() => document.getElementById('status-bar').innerText = "Ready", 3000);
+                this.showStatus("Saved to local storage");
             }
         });
 
         document.getElementById('btn-load').addEventListener('click', () => {
             if (this.controller.loadLocal()) {
-                document.getElementById('status-bar').innerText = "Loaded from local storage.";
-                setTimeout(() => document.getElementById('status-bar').innerText = "Ready", 3000);
+                this.showStatus("Loaded from local storage");
+                this.render(); // force render
             }
         });
 
@@ -114,7 +160,6 @@ class CanvasUI {
         });
 
         document.getElementById('btn-export-pdf').addEventListener('click', () => {
-             // Exporter hook
              if (window.PDFExporter) {
                  window.PDFExporter.export(this.controller.model, this.canvas);
              } else {
@@ -124,25 +169,27 @@ class CanvasUI {
 
         // Import JSON
         const btnImport = document.getElementById('btn-import');
-        btnImport.addEventListener('click', () => {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'application/json';
-            input.onchange = e => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = e => {
-                    if (this.controller.model.load(e.target.result)) {
-                        this.controller.history = [];
-                        this.controller.historyIndex = -1;
-                        this.controller.saveState();
-                    }
+        if(btnImport) {
+            btnImport.addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'application/json';
+                input.onchange = e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        if (this.controller.model.load(e.target.result)) {
+                            this.controller.historyEngine.clear();
+                            this.controller.historyEngine.saveState(this.controller.model.data);
+                            this.render();
+                        }
+                    };
+                    reader.readAsText(file);
                 };
-                reader.readAsText(file);
-            };
-            input.click();
-        });
+                input.click();
+            });
+        }
 
         // Undo / Redo
         const btnUndo = document.getElementById('btn-undo');
@@ -151,7 +198,7 @@ class CanvasUI {
         btnUndo.addEventListener('click', () => this.controller.undo());
         btnRedo.addEventListener('click', () => this.controller.redo());
 
-        this.controller.on('history_changed', ({canUndo, canRedo}) => {
+        this.controller.historyEngine.on('history_changed', ({canUndo, canRedo}) => {
             btnUndo.disabled = !canUndo;
             btnRedo.disabled = !canRedo;
         });
@@ -166,47 +213,142 @@ class CanvasUI {
             this.updateZoomDisplay();
             this.render();
         });
+        const fitBtn = document.getElementById('btn-zoom-fit');
+        if(fitBtn) {
+            fitBtn.addEventListener('click', () => {
+                const data = this.controller.model.data;
+                if(data.walls.length === 0) return;
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                data.walls.forEach(w => {
+                    minX = Math.min(minX, w.start.x, w.end.x);
+                    minY = Math.min(minY, w.start.y, w.end.y);
+                    maxX = Math.max(maxX, w.start.x, w.end.x);
+                    maxY = Math.max(maxY, w.start.y, w.end.y);
+                });
+
+                const fpWidth = maxX - minX;
+                const fpHeight = maxY - minY;
+
+                const padding = 100; // pixels
+                const scaleX = (this.canvas.width - padding) / fpWidth;
+                const scaleY = (this.canvas.height - padding) / fpHeight;
+
+                this.zoom = Math.min(scaleX, scaleY);
+                this.zoom = Math.max(0.1, Math.min(5, this.zoom));
+
+                const cx = minX + fpWidth/2;
+                const cy = minY + fpHeight/2;
+
+                this.panX = this.canvas.width/2 - cx * this.zoom;
+                this.panY = this.canvas.height/2 - cy * this.zoom;
+
+                this.updateZoomDisplay();
+                this.render();
+            });
+        }
 
         // Settings
         document.getElementById('input-scale').addEventListener('change', (e) => {
-            this.controller.setScale(parseFloat(e.target.value));
+            const val = parseFloat(e.target.value);
+            this.controller.setScale(val);
+            document.getElementById('scale-value-display').innerText = val;
             this.render();
         });
+
+        document.getElementById('input-grid-size').addEventListener('change', (e) => {
+            this.controller.snapEngine.setGridSize(parseInt(e.target.value));
+            this.render();
+        });
+
+        // Mobile menu
+        const mobileMenu = document.getElementById('btn-mobile-menu');
+        if(mobileMenu) {
+            mobileMenu.addEventListener('click', () => {
+                document.getElementById('sidebar-left').classList.toggle('mobile-hidden');
+            });
+        }
+
+        this.populateObjectPalette();
     }
 
-    setZoom(newZoom) {
-        // Keep center
-        const center = this.getMousePos({clientX: this.canvas.width/2 + this.canvas.getBoundingClientRect().left, clientY: this.canvas.height/2 + this.canvas.getBoundingClientRect().top});
+    showStatus(msg) {
+        const sb = document.getElementById('status-bar');
+        sb.innerText = msg;
+        setTimeout(() => sb.innerText = "Ready", 3000);
+    }
+
+    populateObjectPalette() {
+        const catSelect = document.getElementById('object-category-select');
+        const objList = document.getElementById('object-list');
+        const categories = ObjectManager.getCategories();
+
+        const renderList = (cat) => {
+            objList.innerHTML = '';
+            if(!categories[cat]) return;
+            categories[cat].forEach(obj => {
+                const div = document.createElement('div');
+                div.className = 'object-item';
+                div.innerText = obj.name;
+                div.onclick = () => {
+                    document.querySelectorAll('.object-item').forEach(el => el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    this.controller.currentObjectType = obj.id;
+                };
+                objList.appendChild(div);
+            });
+            if(objList.firstChild) objList.firstChild.click();
+        };
+
+        catSelect.addEventListener('change', (e) => renderList(e.target.value));
+        renderList(catSelect.value);
+    }
+
+    setZoom(newZoom, mouseX, mouseY) {
+        if(mouseX === undefined) mouseX = this.canvas.width/2;
+        if(mouseY === undefined) mouseY = this.canvas.height/2;
+
+        // Mouse pos before zoom
+        const x = (mouseX - this.panX) / this.zoom;
+        const y = (mouseY - this.panY) / this.zoom;
+
         this.zoom = Math.max(0.1, Math.min(5, newZoom));
 
-        this.panX = this.canvas.width/2 - center.x * this.zoom;
-        this.panY = this.canvas.height/2 - center.y * this.zoom;
+        this.panX = mouseX - x * this.zoom;
+        this.panY = mouseY - y * this.zoom;
 
         this.updateZoomDisplay();
         this.render();
     }
 
     updateZoomDisplay() {
-        document.getElementById('zoom-level').innerText = `${Math.round(this.zoom * 100)}%`;
+        const zl = document.getElementById('zoom-level');
+        if(zl) zl.innerText = `${Math.round(this.zoom * 100)}%`;
     }
 
-    // --- Mouse Interactions ---
+    // --- Interaction Core ---
 
-    onMouseDown(e) {
-        if (e.button === 1 || (e.button === 0 && e.altKey)) { // Middle click or Alt+Click for pan
+    handleInputStart(pos, rawX, rawY, isMiddleClick) {
+        if (isMiddleClick || this.controller.currentTool === 'pan') {
             this.isPanning = true;
-            this.lastMouseX = e.clientX;
-            this.lastMouseY = e.clientY;
+            this.lastMouseX = rawX;
+            this.lastMouseY = rawY;
             this.canvas.style.cursor = 'grabbing';
             return;
         }
 
-        if (e.button !== 0) return;
-
-        const pos = this.getMousePos(e);
-        const snappedPos = GeometryEngine.snapPoint(pos, this.controller.model.data.walls);
+        const useGrid = document.getElementById('check-snap-grid')?.checked;
+        const snappedPos = this.controller.snapEngine.snapPoint(pos, this.controller.model.data.walls, useGrid);
 
         if (this.controller.currentTool === 'select') {
+            // Check handles first
+            this.activeHandle = this.hitTestHandle(pos);
+            if(this.activeHandle) {
+                this.isDragging = true;
+                this.controller.selectElement(this.activeHandle.wallId);
+                return;
+            }
+
             const hit = this.hitTest(pos);
             this.controller.selectElement(hit ? hit.id : null);
             if (hit) {
@@ -220,41 +362,98 @@ class CanvasUI {
                 this.tempWallStart = snappedPos;
                 this.currentMousePos = snappedPos;
             } else {
-                // End wall
-                this.controller.addWall(this.tempWallStart, snappedPos);
-                this.tempWallStart = snappedPos; // Start next wall from here
+                let finalPos = snappedPos;
+                if(document.getElementById('check-snap-angle')?.checked) {
+                    finalPos = this.controller.snapEngine.snapAngle(this.tempWallStart, finalPos);
+                }
+                this.controller.addWall(this.tempWallStart, finalPos);
+                this.tempWallStart = finalPos; // Continuous drawing
             }
         }
         else if (this.controller.currentTool === 'door' || this.controller.currentTool === 'window') {
             const hit = this.hitTest(pos, ['wall']);
             if (hit) {
-                // Simple implementation: place at exact pos on wall
+                const projected = GeometryEngine.projectPointOnLine(pos, hit.start, hit.end);
+
+                // Calculate rotation based on wall angle
+                const dx = hit.end.x - hit.start.x;
+                const dy = hit.end.y - hit.start.y;
+                let angle = Math.atan2(dy, dx);
+
                 if (this.controller.currentTool === 'door') {
-                    this.controller.addDoorToWall(hit.id, pos);
+                    this.controller.model.addDoor(hit.id, projected, 80, angle, false);
                 } else {
-                    this.controller.addWindowToWall(hit.id, pos);
+                    this.controller.model.addWindow(hit.id, projected, 100, angle);
                 }
+                this.controller.commitAction();
+            }
+        }
+        else if (this.controller.currentTool === 'object') {
+            if(this.controller.currentObjectType) {
+                const size = ObjectManager.getDefaultSize(this.controller.currentObjectType);
+                this.controller.model.addObject(this.controller.currentObjectType, snappedPos, size, 0);
+                this.controller.commitAction();
+                // Revert to select
+                document.querySelector('[data-tool="select"]').click();
+            }
+        }
+        else if (this.controller.currentTool === 'measurement') {
+            const mEngine = this.controller.measurementEngine;
+            if(!mEngine.active) {
+                mEngine.startMeasurement(snappedPos);
+            } else {
+                const res = mEngine.endMeasurement();
+                this.showStatus(`Measurement: ${(GeometryEngine.distance(res.start, res.end) * this.controller.model.data.scale).toFixed(2)}m`);
+                document.querySelector('[data-tool="select"]').click();
             }
         }
     }
 
-    onMouseMove(e) {
+    handleInputMove(pos, rawX, rawY) {
         if (this.isPanning) {
-            const dx = e.clientX - this.lastMouseX;
-            const dy = e.clientY - this.lastMouseY;
+            const dx = rawX - this.lastMouseX;
+            const dy = rawY - this.lastMouseY;
             this.panX += dx;
             this.panY += dy;
-            this.lastMouseX = e.clientX;
-            this.lastMouseY = e.clientY;
+            this.lastMouseX = rawX;
+            this.lastMouseY = rawY;
             this.render();
             return;
         }
 
-        const pos = this.getMousePos(e);
         this.currentMousePos = pos;
-
-        // Update coords display
         document.getElementById('coordinates').innerText = `X: ${Math.round(pos.x)}, Y: ${Math.round(pos.y)}`;
+
+        const useGrid = document.getElementById('check-snap-grid')?.checked;
+        const useAngle = document.getElementById('check-snap-angle')?.checked;
+
+        let ignoreWallId = null;
+        if(this.activeHandle) ignoreWallId = this.activeHandle.wallId;
+        else if (this.isDragging) ignoreWallId = this.controller.selectedElementId;
+
+        this.snapPoint = this.controller.snapEngine.snapPoint(pos, this.controller.model.data.walls, useGrid, ignoreWallId);
+
+        if (this.activeHandle && this.controller.selectedElementId) {
+            let finalPos = this.snapPoint;
+
+            const el = this.controller.model.getElementById(this.controller.selectedElementId);
+            if(useAngle && el) {
+                // If moving start, angle from end to start. If moving end, angle from start to end.
+                if(this.activeHandle.type === 'start') {
+                    finalPos = this.controller.snapEngine.snapAngle(el.end, finalPos);
+                } else {
+                    finalPos = this.controller.snapEngine.snapAngle(el.start, finalPos);
+                }
+            }
+
+            if (this.activeHandle.type === 'start') {
+                this.controller.updateWallEnd(el.id, { start: finalPos, end: el.end });
+            } else {
+                this.controller.updateWallEnd(el.id, { start: el.start, end: finalPos });
+            }
+            this.render();
+            return;
+        }
 
         if (this.isDragging && this.controller.selectedElementId) {
             const dx = pos.x - this.lastMouseX;
@@ -262,14 +461,28 @@ class CanvasUI {
 
             const el = this.controller.model.getElementById(this.controller.selectedElementId);
             if (el && el.type === 'wall') {
-                this.controller.model.updateWall(el.id, {
+                this.controller.updateWallEnd(el.id, {
                     start: { x: el.start.x + dx, y: el.start.y + dy },
                     end: { x: el.end.x + dx, y: el.end.y + dy }
                 });
-            } else if (el && (el.type === 'door' || el.type === 'window')) {
-                // Moving doors/windows (simplified, just free move)
+            } else if (el && (el.type === 'door' || el.type === 'window' || el.type === 'object' || el.type === 'label')) {
+                // Moving objects
                 el.position.x += dx;
                 el.position.y += dy;
+
+                // Snap door/window to wall if nearby
+                if(el.type === 'door' || el.type === 'window') {
+                    const hit = this.hitTest(pos, ['wall']);
+                    if(hit) {
+                        const projected = GeometryEngine.projectPointOnLine(pos, hit.start, hit.end);
+                        el.position = projected;
+                        el.wallId = hit.id;
+                        const wallDx = hit.end.x - hit.start.x;
+                        const wallDy = hit.end.y - hit.start.y;
+                        el.rotation = Math.atan2(wallDy, wallDx);
+                    }
+                }
+
                 this.controller.model.emit('change');
             }
 
@@ -278,81 +491,212 @@ class CanvasUI {
         }
 
         if (this.controller.currentTool === 'wall' && this.tempWallStart) {
-            this.render(); // Re-render to show temp wall
+            if(useAngle) {
+                this.snapPoint = this.controller.snapEngine.snapAngle(this.tempWallStart, this.snapPoint);
+                this.currentMousePos = this.snapPoint;
+            }
+        }
+
+        if (this.controller.currentTool === 'measurement' && this.controller.measurementEngine.active) {
+            this.controller.measurementEngine.updateMeasurement(this.snapPoint);
+        }
+
+        // Re-render for temp walls, snapping, dragging
+        if(this.controller.currentTool === 'wall' || this.controller.currentTool === 'measurement' || this.isDragging || this.activeHandle || this.snapPoint) {
+            this.render();
         }
     }
 
-    onMouseUp(e) {
+    handleInputEnd() {
         if (this.isPanning) {
             this.isPanning = false;
-            this.canvas.style.cursor = 'default';
+            this.canvas.style.cursor = 'crosshair';
         }
 
-        if (this.isDragging) {
+        if (this.isDragging || this.activeHandle) {
             this.isDragging = false;
-            this.controller.commitAction(); // Save state after drag ends
+            this.activeHandle = null;
+            this.controller.commitAction(); // Save state after drag/resize ends
         }
+    }
 
+    // --- Mouse Events ---
+
+    onMouseDown(e) {
+        if (e.button !== 0 && e.button !== 1) return;
+        const pos = this.getMousePos(e);
+        const isMiddleClick = e.button === 1 || (e.button === 0 && e.altKey);
+        this.handleInputStart(pos, e.clientX, e.clientY, isMiddleClick);
+    }
+
+    onMouseMove(e) {
+        const pos = this.getMousePos(e);
+        this.handleInputMove(pos, e.clientX, e.clientY);
+    }
+
+    onMouseUp(e) {
+        this.handleInputEnd();
         // Right click cancels wall drawing
-        if (e.button === 2 && this.controller.currentTool === 'wall') {
-            this.tempWallStart = null;
-            this.render();
+        if (e.button === 2) {
+            if(this.controller.currentTool === 'wall') {
+                this.tempWallStart = null;
+                this.render();
+            } else if (this.controller.currentTool === 'measurement') {
+                this.controller.measurementEngine.active = false;
+                this.render();
+            }
         }
     }
 
     onWheel(e) {
         e.preventDefault();
-        const zoomFactor = 1.1;
         const mousePos = this.getMousePos(e);
+        const zoomFactor = 1.1;
 
+        let newZoom = this.zoom;
         if (e.deltaY < 0) {
-            this.zoom *= zoomFactor;
+            newZoom *= zoomFactor;
         } else {
-            this.zoom /= zoomFactor;
+            newZoom /= zoomFactor;
         }
 
-        this.zoom = Math.max(0.1, Math.min(5, this.zoom));
-
-        // Adjust pan to zoom around mouse cursor
-        this.panX = e.clientX - this.canvas.getBoundingClientRect().left - mousePos.x * this.zoom;
-        this.panY = e.clientY - this.canvas.getBoundingClientRect().top - mousePos.y * this.zoom;
-
-        this.updateZoomDisplay();
-        this.render();
+        this.setZoom(newZoom, e.clientX - this.canvas.getBoundingClientRect().left, e.clientY - this.canvas.getBoundingClientRect().top);
     }
 
-    hitTest(pos, types = ['wall', 'door', 'window']) {
-        const HIT_TOLERANCE = 10 / this.zoom;
+    // --- Touch Events ---
+
+    onTouchStart(e) {
+        e.preventDefault();
+        const touches = e.touches;
+
+        if (touches.length === 1) {
+            const pos = this.getMousePos(e);
+            // Simulate middle click panning if panning tool is active or 2 fingers (handled below)
+            this.handleInputStart(pos, touches[0].clientX, touches[0].clientY, false);
+        } else if (touches.length === 2) {
+            // Pinch to zoom / Pan
+            this.isPanning = true;
+            this.isDragging = false;
+            this.activeHandle = null;
+
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            this.lastPinchDist = Math.sqrt(dx*dx + dy*dy);
+
+            this.lastTouchCenter = {
+                x: (touches[0].clientX + touches[1].clientX) / 2,
+                y: (touches[0].clientY + touches[1].clientY) / 2
+            };
+            this.lastMouseX = this.lastTouchCenter.x;
+            this.lastMouseY = this.lastTouchCenter.y;
+        }
+    }
+
+    onTouchMove(e) {
+        e.preventDefault();
+        const touches = e.touches;
+
+        if (touches.length === 1 && !this.isPanning) {
+            const pos = this.getMousePos(e);
+            this.handleInputMove(pos, touches[0].clientX, touches[0].clientY);
+        } else if (touches.length === 2) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            const center = {
+                x: (touches[0].clientX + touches[1].clientX) / 2,
+                y: (touches[0].clientY + touches[1].clientY) / 2
+            };
+
+            // Pan
+            const panDx = center.x - this.lastMouseX;
+            const panDy = center.y - this.lastMouseY;
+            this.panX += panDx;
+            this.panY += panDy;
+            this.lastMouseX = center.x;
+            this.lastMouseY = center.y;
+
+            // Zoom
+            if (this.lastPinchDist) {
+                const zoomDelta = dist / this.lastPinchDist;
+                const newZoom = this.zoom * zoomDelta;
+                // Calculate mouse pos relative to canvas
+                const rect = this.canvas.getBoundingClientRect();
+                this.setZoom(newZoom, center.x - rect.left, center.y - rect.top);
+            }
+            this.lastPinchDist = dist;
+        }
+    }
+
+    onTouchEnd(e) {
+        e.preventDefault();
+        this.handleInputEnd();
+        this.lastPinchDist = null;
+        this.lastTouchCenter = null;
+
+        if (e.touches.length === 0 && this.isPanning) {
+            this.isPanning = false;
+        }
+    }
+
+    // --- Hit Testing ---
+
+    hitTestHandle(pos) {
+        const HIT_TOLERANCE = 15 / this.zoom;
+        const elId = this.controller.selectedElementId;
+        if(!elId) return null;
+
+        const el = this.controller.model.getElementById(elId);
+        if(el && el.type === 'wall') {
+            if (GeometryEngine.distance(pos, el.start) < HIT_TOLERANCE) {
+                return { wallId: el.id, type: 'start' };
+            }
+            if (GeometryEngine.distance(pos, el.end) < HIT_TOLERANCE) {
+                return { wallId: el.id, type: 'end' };
+            }
+        }
+        return null;
+    }
+
+    hitTest(pos, types = ['door', 'window', 'object', 'label', 'wall', 'room']) {
+        const HIT_TOLERANCE = 15 / this.zoom;
         const data = this.controller.model.data;
 
-        // Check doors and windows first (they are smaller, on top of walls)
-        if (types.includes('door') || types.includes('window')) {
-            const items = [...data.doors, ...data.windows];
-            for (const item of items) {
-                if (GeometryEngine.distance(pos, item.position) < HIT_TOLERANCE * 2) {
-                    return item;
+        for (const type of types) {
+            if (type === 'door' || type === 'window' || type === 'object') {
+                const items = type === 'object' ? (data.objects || []) : (type === 'door' ? data.doors : data.windows);
+                for (const item of items) {
+                    if (GeometryEngine.distance(pos, item.position) < HIT_TOLERANCE * 2) {
+                        return item;
+                    }
                 }
             }
-        }
 
-        // Check walls
-        if (types.includes('wall')) {
-            for (const wall of data.walls) {
-                const dist = GeometryEngine.distanceToSegment(pos, wall.start, wall.end);
-                if (dist < HIT_TOLERANCE + wall.thickness/2) {
-                    return wall;
+            if (type === 'label' && data.labels) {
+                for (const lbl of data.labels) {
+                     if (GeometryEngine.distance(pos, lbl.position) < HIT_TOLERANCE * 2) {
+                        return lbl;
+                    }
                 }
             }
-        }
 
-        // Check rooms (basic bounding box or centroid hit test)
-        // Simplified: return room if within polygon
-        if (types.includes('room')) {
-             for (const room of data.rooms) {
-                 if(this.pointInPolygon(pos, room.boundary)) {
-                     return room;
+            if (type === 'wall') {
+                for (const wall of data.walls) {
+                    const dist = GeometryEngine.distanceToSegment(pos, wall.start, wall.end);
+                    if (dist < HIT_TOLERANCE + wall.thickness/2) {
+                        return wall;
+                    }
+                }
+            }
+
+            if (type === 'room') {
+                 for (const room of data.rooms) {
+                     if(this.pointInPolygon(pos, room.boundary)) {
+                         return room;
+                     }
                  }
-             }
+            }
         }
 
         return null;
@@ -371,142 +715,21 @@ class CanvasUI {
         return inside;
     }
 
-    // --- Rendering ---
-
+    // --- Rendering Wrapper ---
     render() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        this.ctx.save();
-        this.ctx.translate(this.panX, this.panY);
-        this.ctx.scale(this.zoom, this.zoom);
-
-        this.drawGrid();
-
-        const data = this.controller.model.data;
-
-        // Rooms
-        for (const room of data.rooms) {
-            this.drawRoom(room);
-        }
-
-        // Walls
-        for (const wall of data.walls) {
-            this.drawWall(wall, wall.id === this.controller.selectedElementId);
-        }
-
-        // Temp Wall
-        if (this.controller.currentTool === 'wall' && this.tempWallStart && this.currentMousePos) {
-            const snappedPos = GeometryEngine.snapPoint(this.currentMousePos, data.walls);
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.tempWallStart.x, this.tempWallStart.y);
-            this.ctx.lineTo(snappedPos.x, snappedPos.y);
-            this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.5)';
-            this.ctx.lineWidth = 10;
-            this.ctx.stroke();
-
-            // Show length
-            const dist = GeometryEngine.distance(this.tempWallStart, snappedPos);
-            const mDist = (dist * data.scale).toFixed(2);
-            this.ctx.fillStyle = 'blue';
-            this.ctx.font = '12px Arial';
-            this.ctx.fillText(`${mDist}m`, (this.tempWallStart.x + snappedPos.x)/2, (this.tempWallStart.y + snappedPos.y)/2 - 10);
-        }
-
-        // Doors & Windows
-        for (const door of data.doors) {
-            this.drawDoor(door, door.id === this.controller.selectedElementId);
-        }
-        for (const win of data.windows) {
-            this.drawWindow(win, win.id === this.controller.selectedElementId);
-        }
-
-        this.ctx.restore();
-
+        const state = {
+            panX: this.panX,
+            panY: this.panY,
+            zoom: this.zoom,
+            currentTool: this.controller.currentTool,
+            tempWallStart: this.tempWallStart,
+            currentMousePos: this.currentMousePos,
+            selectedElementId: this.controller.selectedElementId,
+            measurement: this.controller.measurementEngine,
+            snapPoint: this.snapPoint
+        };
+        this.renderer.render(state);
         this.updateRoomsList();
-    }
-
-    drawGrid() {
-        const gridSize = 50; // pixels
-        const w = this.canvas.width / this.zoom;
-        const h = this.canvas.height / this.zoom;
-
-        const startX = -this.panX / this.zoom;
-        const startY = -this.panY / this.zoom;
-
-        this.ctx.strokeStyle = '#e0e0e0';
-        this.ctx.lineWidth = 1 / this.zoom;
-
-        this.ctx.beginPath();
-        for (let x = Math.floor(startX / gridSize) * gridSize; x < startX + w; x += gridSize) {
-            this.ctx.moveTo(x, startY);
-            this.ctx.lineTo(x, startY + h);
-        }
-        for (let y = Math.floor(startY / gridSize) * gridSize; y < startY + h; y += gridSize) {
-            this.ctx.moveTo(startX, y);
-            this.ctx.lineTo(startX + w, y);
-        }
-        this.ctx.stroke();
-    }
-
-    drawWall(wall, isSelected) {
-        this.ctx.beginPath();
-        this.ctx.moveTo(wall.start.x, wall.start.y);
-        this.ctx.lineTo(wall.end.x, wall.end.y);
-        this.ctx.strokeStyle = isSelected ? '#3498db' : '#2c3e50';
-        this.ctx.lineWidth = wall.thickness;
-        this.ctx.lineCap = 'round';
-        this.ctx.stroke();
-
-        // Draw length if selected
-        if (isSelected) {
-            const dist = GeometryEngine.distance(wall.start, wall.end);
-            const mDist = (dist * this.controller.model.data.scale).toFixed(2);
-            this.ctx.fillStyle = '#e74c3c';
-            this.ctx.font = `${14/this.zoom}px Arial`;
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(`${mDist}m`, (wall.start.x + wall.end.x)/2, (wall.start.y + wall.end.y)/2 - wall.thickness);
-        }
-    }
-
-    drawRoom(room) {
-        if (!room.boundary || room.boundary.length < 3) return;
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(room.boundary[0].x, room.boundary[0].y);
-        for(let i=1; i<room.boundary.length; i++) {
-            this.ctx.lineTo(room.boundary[i].x, room.boundary[i].y);
-        }
-        this.ctx.closePath();
-
-        this.ctx.fillStyle = room.id === this.controller.selectedElementId ? 'rgba(52, 152, 219, 0.3)' : 'rgba(236, 240, 241, 0.5)';
-        this.ctx.fill();
-
-        // Calculate centroid for text
-        let cx = 0, cy = 0;
-        for(let p of room.boundary) { cx += p.x; cy += p.y; }
-        cx /= room.boundary.length;
-        cy /= room.boundary.length;
-
-        this.ctx.fillStyle = '#333';
-        this.ctx.font = `${14/this.zoom}px Arial`;
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(room.name, cx, cy);
-        this.ctx.font = `${12/this.zoom}px Arial`;
-        this.ctx.fillText(`${room.area.toFixed(2)} sqm`, cx, cy + 15/this.zoom);
-    }
-
-    drawDoor(door, isSelected) {
-        this.ctx.fillStyle = isSelected ? '#3498db' : '#f1c40f';
-        this.ctx.beginPath();
-        this.ctx.arc(door.position.x, door.position.y, door.width / 2, 0, Math.PI * 2);
-        this.ctx.fill();
-        this.ctx.stroke();
-    }
-
-    drawWindow(win, isSelected) {
-        this.ctx.fillStyle = isSelected ? '#3498db' : '#87ceeb';
-        this.ctx.fillRect(win.position.x - win.width/2, win.position.y - 5, win.width, 10);
-        this.ctx.strokeRect(win.position.x - win.width/2, win.position.y - 5, win.width, 10);
     }
 
     // --- UI Panels ---
@@ -519,78 +742,79 @@ class CanvasUI {
         }
 
         const el = this.controller.model.getElementById(this.controller.selectedElementId);
-        if (!el) return;
+        if (!el) {
+             panel.innerHTML = '<p class="placeholder-text">Select an element to view properties</p>';
+             return;
+        }
 
         panel.innerHTML = '';
 
-        const typeEl = document.createElement('strong');
-        typeEl.textContent = 'Type: ';
-        panel.appendChild(typeEl);
-        panel.appendChild(document.createTextNode(el.type));
-        panel.appendChild(document.createElement('br'));
-
-        const idEl = document.createElement('strong');
-        idEl.textContent = 'ID: ';
-        panel.appendChild(idEl);
-        panel.appendChild(document.createTextNode(el.id));
-        panel.appendChild(document.createElement('br'));
-        panel.appendChild(document.createElement('br'));
+        const typeInfo = document.createElement('div');
+        typeInfo.className = 'property-info';
+        typeInfo.innerHTML = `<strong>${el.type.toUpperCase()}</strong><br><small>ID: ${el.id}</small>`;
+        panel.appendChild(typeInfo);
 
         if (el.type === 'room') {
-            const row1 = document.createElement('div');
-            row1.className = 'property-row';
-            const label1 = document.createElement('label');
-            label1.textContent = 'Name';
-            const input1 = document.createElement('input');
-            input1.type = 'text';
-            input1.id = 'prop-room-name';
-            input1.value = el.name;
-            row1.appendChild(label1);
-            row1.appendChild(input1);
-            panel.appendChild(row1);
-
-            const row2 = document.createElement('div');
-            row2.className = 'property-row';
-            const label2 = document.createElement('label');
-            label2.textContent = 'Type';
-            const input2 = document.createElement('input');
-            input2.type = 'text';
-            input2.id = 'prop-room-type';
-            input2.value = el.type;
-            row2.appendChild(label2);
-            row2.appendChild(input2);
-            panel.appendChild(row2);
-
-            const areaP = document.createElement('p');
-            const areaStrong = document.createElement('strong');
-            areaStrong.textContent = 'Area: ';
-            areaP.appendChild(areaStrong);
-            areaP.appendChild(document.createTextNode(`${el.area.toFixed(2)} sqm`));
-            panel.appendChild(areaP);
-
-            // Bind inputs
-            input1.addEventListener('change', (e) => {
-                this.controller.model.updateRoom(el.id, { name: e.target.value });
-                this.controller.saveState();
-            });
-            input2.addEventListener('change', (e) => {
-                this.controller.model.updateRoom(el.id, { type: e.target.value });
-                this.controller.saveState();
-            });
+            this.createInputRow(panel, 'Name', el.name, (val) => this.updateProp(el.id, {name: val}));
+            this.createInputRow(panel, 'Type', el.type, null, true); // readonly
+            this.createInputRow(panel, 'Area (m²)', el.area.toFixed(2), null, true);
         } else if (el.type === 'wall') {
             const length = (GeometryEngine.distance(el.start, el.end) * this.controller.model.data.scale).toFixed(2);
-            const lengthP = document.createElement('p');
-            const lengthStrong = document.createElement('strong');
-            lengthStrong.textContent = 'Length: ';
-            lengthP.appendChild(lengthStrong);
-            lengthP.appendChild(document.createTextNode(`${length} m`));
-            panel.appendChild(lengthP);
+            this.createInputRow(panel, 'Length (m)', length, null, true);
+            this.createInputRow(panel, 'Thickness', el.thickness, (val) => this.updateProp(el.id, {thickness: parseFloat(val)}), false, 'number');
+        } else if (el.type === 'door') {
+            this.createInputRow(panel, 'Width', el.width, (val) => this.updateProp(el.id, {width: parseFloat(val)}), false, 'number');
+
+            const flipBtn = document.createElement('button');
+            flipBtn.innerText = "Flip Direction";
+            flipBtn.onclick = () => {
+                this.updateProp(el.id, {flip: !el.flip});
+            };
+            panel.appendChild(flipBtn);
+        } else if (el.type === 'window' || el.type === 'object') {
+            this.createInputRow(panel, 'Width', el.width, (val) => this.updateProp(el.id, {width: parseFloat(val)}), false, 'number');
+            if(el.height) {
+                this.createInputRow(panel, 'Height', el.height, (val) => this.updateProp(el.id, {height: parseFloat(val)}), false, 'number');
+            }
+            this.createInputRow(panel, 'Rotation (deg)', (el.rotation * 180 / Math.PI).toFixed(0), (val) => {
+                this.updateProp(el.id, {rotation: parseFloat(val) * Math.PI / 180});
+            }, false, 'number');
+        } else if (el.type === 'label') {
+            this.createInputRow(panel, 'Text', el.text, (val) => this.updateProp(el.id, {text: val}));
+            this.createInputRow(panel, 'Font Size', el.fontSize, (val) => this.updateProp(el.id, {fontSize: parseInt(val)}), false, 'number');
         }
+    }
+
+    createInputRow(panel, labelText, value, onChange, readonly = false, type = 'text') {
+        const row = document.createElement('div');
+        row.className = 'property-row';
+        const label = document.createElement('label');
+        label.textContent = labelText;
+        const input = document.createElement('input');
+        input.type = type;
+        input.value = value;
+        if(readonly) {
+            input.disabled = true;
+            input.style.backgroundColor = '#f8f9fa';
+        } else if (onChange) {
+            input.addEventListener('change', (e) => onChange(e.target.value));
+        }
+        row.appendChild(label);
+        row.appendChild(input);
+        panel.appendChild(row);
+    }
+
+    updateProp(id, updates) {
+        this.controller.model.updateElement(id, updates);
+        this.controller.commitAction();
+        this.render();
     }
 
     updateRoomsList() {
         const list = document.getElementById('rooms-list');
         const rooms = this.controller.model.data.rooms;
+
+        if(!list) return;
 
         list.innerHTML = '';
 
@@ -602,18 +826,17 @@ class CanvasUI {
         rooms.forEach(room => {
             const roomDiv = document.createElement('div');
             roomDiv.className = 'room-item';
-            roomDiv.style.cursor = 'pointer';
+            if(room.id === this.controller.selectedElementId) {
+                roomDiv.classList.add('selected');
+                roomDiv.style.borderColor = 'var(--accent-color)';
+                roomDiv.style.backgroundColor = '#ebf5fb';
+            }
 
-            const nameStrong = document.createElement('strong');
-            nameStrong.textContent = room.name;
-            roomDiv.appendChild(nameStrong);
-            roomDiv.appendChild(document.createElement('br'));
-
-            roomDiv.appendChild(document.createTextNode(`Area: ${room.area.toFixed(2)} sqm`));
+            roomDiv.innerHTML = `<strong>${room.name}</strong><small>${room.area.toFixed(2)} m²</small>`;
 
             roomDiv.addEventListener('click', () => {
                 this.controller.selectElement(room.id);
-                this.controller.setTool('select');
+                document.querySelector('[data-tool="select"]').click();
                 this.render();
             });
 

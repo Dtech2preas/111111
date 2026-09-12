@@ -6,7 +6,7 @@ class FloorPlanModel extends EventEmitter {
 
     reset() {
         this.data = {
-            version: 1,
+            version: 2,
             id: `floorplan_${Date.now()}`,
             name: "New Floor Plan",
             units: "meters",
@@ -15,7 +15,9 @@ class FloorPlanModel extends EventEmitter {
             walls: [],
             rooms: [],
             doors: [],
-            windows: []
+            windows: [],
+            objects: [],
+            labels: []
         };
         this.emit('change');
     }
@@ -25,6 +27,12 @@ class FloorPlanModel extends EventEmitter {
             const data = JSON.parse(jsonData);
             if (!data.version || !data.walls) {
                 throw new Error("Invalid floor plan data");
+            }
+            // Migrate v1 to v2
+            if (data.version === 1) {
+                data.version = 2;
+                if (!data.objects) data.objects = [];
+                if (!data.labels) data.labels = [];
             }
             this.data = data;
             this.emit('change');
@@ -113,35 +121,80 @@ class FloorPlanModel extends EventEmitter {
     }
 
     // Doors & Windows
-    addDoor(wallId, position, width = 40) {
+    addDoor(wallId, position, width = 80, rotation = 0, flip = false) {
         const door = {
             id: this.generateId('door'),
             type: 'door',
             wallId: wallId,
-            position: position, // normalized distance along wall (0 to 1) or coordinates
-            width: width
+            position: { x: position.x, y: position.y },
+            width: width,
+            rotation: rotation,
+            flip: flip
         };
         this.data.doors.push(door);
         this.emit('change');
         return door;
     }
 
-    addWindow(wallId, position, width = 60) {
+    addWindow(wallId, position, width = 100, rotation = 0) {
         const win = {
             id: this.generateId('window'),
             type: 'window',
             wallId: wallId,
-            position: position,
-            width: width
+            position: { x: position.x, y: position.y },
+            width: width,
+            rotation: rotation
         };
         this.data.windows.push(win);
         this.emit('change');
         return win;
     }
 
+    // Objects
+    addObject(type, position, size, rotation = 0) {
+        const obj = {
+            id: this.generateId('object'),
+            type: type,
+            position: { x: position.x, y: position.y },
+            width: size.width,
+            height: size.height,
+            rotation: rotation
+        };
+        if (!this.data.objects) this.data.objects = [];
+        this.data.objects.push(obj);
+        this.emit('change');
+        return obj;
+    }
+
+    // Labels
+    addLabel(text, position, fontSize = 14, color = '#333') {
+        const lbl = {
+            id: this.generateId('label'),
+            type: 'label',
+            text: text,
+            position: { x: position.x, y: position.y },
+            fontSize: fontSize,
+            color: color
+        };
+        if (!this.data.labels) this.data.labels = [];
+        this.data.labels.push(lbl);
+        this.emit('change');
+        return lbl;
+    }
+
+    updateElement(id, updates) {
+        const el = this.getElementById(id);
+        if (el) {
+            Object.assign(el, updates);
+            this.emit('change');
+        }
+    }
+
     removeElement(id) {
         this.data.doors = this.data.doors.filter(d => d.id !== id);
         this.data.windows = this.data.windows.filter(w => w.id !== id);
+        if (this.data.objects) this.data.objects = this.data.objects.filter(o => o.id !== id);
+        if (this.data.labels) this.data.labels = this.data.labels.filter(l => l.id !== id);
         this.removeWall(id); // Will remove if it's a wall and trigger change
     }
 
@@ -149,6 +202,8 @@ class FloorPlanModel extends EventEmitter {
         return this.data.walls.find(e => e.id === id) ||
                this.data.doors.find(e => e.id === id) ||
                this.data.windows.find(e => e.id === id) ||
-               this.data.rooms.find(e => e.id === id);
+               this.data.rooms.find(e => e.id === id) ||
+               (this.data.objects && this.data.objects.find(e => e.id === id)) ||
+               (this.data.labels && this.data.labels.find(e => e.id === id));
     }
 }
