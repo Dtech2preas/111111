@@ -1,0 +1,223 @@
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #34495e;
+    --accent-color: #3498db;
+    --bg-color: #ecf0f1;
+    --panel-bg: #ffffff;
+    --border-color: #bdc3c7;
+    --text-color: #333333;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+    overflow: hidden; /* Prevent scrolling on whole page */
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+header h1 {
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.toolbar-global button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    margin: 0 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.toolbar-global button:hover:not(:disabled) {
+    background-color: var(--accent-color);
+}
+
+.toolbar-global button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.separator {
+    color: var(--border-color);
+    margin: 0 8px;
+}
+
+main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+aside {
+    background-color: var(--panel-bg);
+    border-right: 1px solid var(--border-color);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-left {
+    width: 250px;
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebar-right {
+    width: 250px;
+    border-left: 1px solid var(--border-color);
+}
+
+aside h3 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    color: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 5px;
+}
+
+.tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.tool-btn {
+    padding: 8px 10px;
+    background-color: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s;
+}
+
+.tool-btn:hover {
+    background-color: #e9ecef;
+}
+
+.tool-btn.active {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.canvas-container {
+    flex: 1;
+    position: relative;
+    background-color: #f5f5f5;
+    overflow: hidden;
+    cursor: default;
+}
+
+#floorplan-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* width/height managed by JS */
+}
+
+footer {
+    background-color: var(--panel-bg);
+    border-top: 1px solid var(--border-color);
+    padding: 8px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    z-index: 10;
+}
+
+#zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#zoom-controls button {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+}
+
+#zoom-controls button:hover {
+    background-color: var(--bg-color);
+}
+
+.settings-group label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+.settings-group input {
+    width: 100%;
+    padding: 5px;
+    margin-top: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+}
+
+.placeholder-text {
+    font-style: italic;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+#properties-panel, #rooms-list {
+    font-size: 0.9rem;
+}
+
+.property-row {
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.property-row label {
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.property-row input {
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.room-item {
+    padding: 8px;
+    border: 1px solid #ddd;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    background: #fafafa;
+}
