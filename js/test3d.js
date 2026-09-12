@@ -441,8 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 transparent: true,
                 opacity: 0.5,
                 roughness: 0.1,
-                transmission: 0.9,
-                thickness: 0.5
+                transmission: 0.9
             });
             data.windows.forEach(win => {
                 const w = win.width || 100;

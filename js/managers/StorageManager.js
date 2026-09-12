@@ -1,9 +1,10 @@
 class StorageManager {
     static SAVE_KEY = 'dtech_floorplan_v2';
 
-    static saveLocal(json) {
+    static saveLocal(json, floorLevel = 0) {
+        const key = `${this.SAVE_KEY}_floor_${floorLevel}`;
         try {
-            localStorage.setItem(this.SAVE_KEY, json);
+            localStorage.setItem(key, json);
             return true;
         } catch (e) {
             console.error("Failed to save to local storage:", e);
@@ -11,8 +12,9 @@ class StorageManager {
         }
     }
 
-    static loadLocal() {
-        return localStorage.getItem(this.SAVE_KEY);
+    static loadLocal(floorLevel = 0) {
+        const key = `${this.SAVE_KEY}_floor_${floorLevel}`;
+        return localStorage.getItem(key);
     }
 
     static exportJSON(json, filename) {

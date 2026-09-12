@@ -576,7 +576,7 @@ class CanvasUI {
                     start: { x: el.start.x + dx, y: el.start.y + dy },
                     end: { x: el.end.x + dx, y: el.end.y + dy }
                 });
-            } else if (el && (el.type === 'door' || el.type === 'window' || el.type === 'object' || el.type === 'label')) {
+            } else if (el && (el.type === 'door' || el.type === 'window' || el.type === 'label' || this.controller.model.data.objects.some(o => o.id === el.id))) {
                 // Moving objects
                 el.position.x += dx;
                 el.position.y += dy;
@@ -601,7 +601,7 @@ class CanvasUI {
                         const wallDy = closestWall.end.y - closestWall.start.y;
                         el.rotation = Math.atan2(wallDy, wallDx);
                     }
-                } else if (el.type === 'object') {
+                } else if (this.controller.model.data.objects.some(o => o.id === el.id)) {
                     // Soft-snap furniture rotation to walls when dragging
                     const hit = this.hitTest(pos, ['wall']);
                     if(hit) {
