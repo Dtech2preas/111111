@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Manager Dashboard - D-TECH RES</title>
+    <link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+            <h1>Manager Dashboard</h1>
+            <div style="flex-grow: 1"></div>
+            <button id="btn-logout" class="btn-text">Log Out</button>
+        </header>
+
+        <main>
+            <h2 id="residence-name">My Residence</h2>
+
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Floor Plans</h3>
+                    <p>Manage floors, rooms, and appliances.</p>
+                    <button id="btn-open-editor" class="btn-primary" onclick="window.location.href='editor.html'">Open Editor</button>
+                </div>
+
+                <div class="card">
+                    <h3>Issues / Alerts</h3>
+                    <ul class="alert-list" id="manager-alerts">
+                        <li class="alert-item green">Loading alerts...</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Students</h3>
+                    <p>Manage student access</p>
+                    <button class="btn-primary" style="background: #6c757d">Generate QR Code</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- We will inject firebase scripts later -->
+    <script type="module" src="js/manager-dashboard.js"></script>
+</body>
+</html>

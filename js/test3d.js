@@ -147,6 +147,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     animate();
 
+    // Issues Integration
+    let activeIssues = {};
+    let latestFloorData = null;
+
+    setTimeout(() => {
+        const residenceId = localStorage.getItem('dtech_residence_id');
+        if (residenceId && window.FirebaseStorageManager) {
+
+            // Listen to floor plan changes
+            window.FirebaseStorageManager.listenToFloorPlan(residenceId, (data) => {
+                latestFloorData = data;
+                buildFloor(data, targetFloorLevel);
+            });
+
+            // Listen to issue changes
+            window.FirebaseStorageManager.listenToIssues(residenceId, (issues) => {
+                activeIssues = issues;
+                if (latestFloorData) {
+                    buildFloor(latestFloorData, targetFloorLevel); // rebuild to apply red materials
+                }
+            });
+        } else {
+            // Load from local storage fallback
+            const localData = localStorage.getItem('dtech_floorplan_v2');
+            if (localData) {
+                latestFloorData = JSON.parse(localData);
+                buildFloor(latestFloorData, targetFloorLevel);
+            }
+        }
+    }, 500);
+
     // UI Listeners
     const targetFloorDisplay = document.getElementById('target-floor-display');
 
@@ -170,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
+                latestFloorData = data;
                 buildFloor(data, targetFloorLevel);
             } catch (err) {
                 console.error("Failed to parse JSON", err);
@@ -252,8 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const extrudeSettings = { depth: 5, bevelEnabled: false };
                 const roomGeom = new THREE.ExtrudeGeometry(roomShape, extrudeSettings);
 
-                // Randomish color for each room
-                const color = new THREE.Color().setHSL((idx * 137.5) % 360 / 360, 0.5, 0.8);
+                let color = new THREE.Color().setHSL((idx * 137.5) % 360 / 360, 0.5, 0.8);
+                if (activeIssues && activeIssues[room.id]) {
+                    color = new THREE.Color(0xff4444); // Red tint for faulty rooms
+                }
                 const roomMat = new THREE.MeshLambertMaterial({ color: color });
 
                 const roomMesh = new THREE.Mesh(roomGeom, roomMat);
@@ -377,6 +411,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (obj.type.includes('sofa')) color = 0xe24a4a;
                 else if (obj.type.includes('table') || obj.type.includes('desk')) color = 0x8b5a2b;
                 else if (obj.type.includes('toilet') || obj.type.includes('bath')) color = 0xffffff;
+
+                if (activeIssues && activeIssues[obj.id]) {
+                    color = 0xff0000; // Bright red for faulty objects
+                }
 
                 const objMat = new THREE.MeshLambertMaterial({ color: color });
                 const objGeom = new THREE.BoxGeometry(w, h, d);
