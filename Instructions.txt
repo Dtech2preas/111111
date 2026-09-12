@@ -1,0 +1,205 @@
+Build the first version of the D-TECH Residence Floor Plan System.
+
+Goal
+
+Create a floor-plan editor that allows a user to create, edit, view, save, and export a residential floor plan.
+
+There is NO AI involved. The system must understand the floor plan using geometry, coordinates, relationships, and deterministic logic.
+
+1. Floor Plan Editor
+
+Create an interactive canvas where the user can:
+
+- Draw walls.
+- Move walls.
+- Delete walls.
+- Extend walls.
+- Connect/snap walls together.
+- Create rooms by enclosing areas with walls.
+- Select individual elements.
+- Move elements.
+- Zoom and pan.
+- Undo/redo changes.
+- Start a new floor plan.
+- Open an existing floor plan.
+
+The drawing should use a coordinate/grid system rather than treating the floor plan as one flat image.
+
+2. Floor Plan Elements
+
+Initially support:
+
+- Walls
+- Rooms
+- Doors
+- Windows
+
+Structure each element as data rather than only drawing pixels.
+
+For example:
+
+{
+  "id": "wall_001",
+  "type": "wall",
+  "start": {"x": 100, "y": 100},
+  "end": {"x": 500, "y": 100},
+  "thickness": 0.15
+}
+
+Rooms should contain their boundaries and calculated properties such as:
+
+{
+  "id": "room_001",
+  "type": "bedroom",
+  "name": "Bedroom 1",
+  "area": 12.5,
+  "boundary": []
+}
+
+3. Geometric Logic
+
+The system must use deterministic geometry to understand the drawing.
+
+It should be able to:
+
+- Detect wall intersections.
+- Snap nearby endpoints together.
+- Detect enclosed areas.
+- Determine room boundaries.
+- Calculate room dimensions.
+- Calculate room area.
+- Determine which doors/windows belong to which room.
+- Detect connected rooms.
+
+Do not use AI or external image-recognition services.
+
+4. Measurements
+
+The editor should support a real-world scale.
+
+For example:
+
+1 drawing unit = X metres
+
+Allow the user to establish or change the scale.
+
+Use the scale to calculate:
+
+- Wall lengths
+- Room width
+- Room height
+- Room area
+- Overall floor dimensions
+
+Display measurements where useful.
+
+5. JSON Storage
+
+The JSON representation is the source of truth for the floor plan.
+
+Do NOT save only a screenshot/image.
+
+A saved floor plan should contain:
+
+{
+  "version": 1,
+  "id": "floorplan_001",
+  "name": "My House",
+  "units": "meters",
+  "scale": 1,
+  "canvas": {
+    "width": 1000,
+    "height": 800
+  },
+  "walls": [],
+  "rooms": [],
+  "doors": [],
+  "windows": []
+}
+
+The exact schema can be improved as implementation progresses.
+
+The JSON must contain enough information to completely reconstruct the floor plan.
+
+Therefore:
+
+JSON → Floor Plan
+
+must be possible without losing information.
+
+6. Save / Load
+
+Implement:
+
+- Save floor plan
+- Load floor plan
+- Edit existing floor plan
+- Save changes
+- Export JSON
+- Import JSON
+
+The application should be able to close and later reconstruct the exact floor plan from its saved data.
+
+For the initial version, local/device storage is sufficient. No backend is required.
+
+7. PDF Export
+
+Add an Export as PDF function.
+
+The PDF should contain a clean representation of the floor plan rather than simply exporting a screenshot of the application interface.
+
+It should include:
+
+- Floor-plan drawing
+- Room names
+- Dimensions where available
+- Room areas
+- Overall floor-plan information
+
+The PDF is an output format.
+
+The JSON remains the editable/source format.
+
+8. Architecture
+
+Separate the system into:
+
+UI / Canvas
+      ↓
+Floor Plan Controller
+      ↓
+Geometry Engine
+      ↓
+Floor Plan Data Model
+      ↓
+JSON Storage
+      ↓
+PDF Export
+
+Keep the geometry engine independent from the UI as much as reasonably possible.
+
+The geometry engine should operate on structured objects such as walls, rooms, doors and windows.
+
+9. Important Requirements
+
+Do not over-engineer the first version.
+
+Do not add:
+
+- AI
+- Cloud backend
+- User accounts
+- Online synchronization
+- Property management
+- Tenant management
+- Maintenance management
+
+Those will come later.
+
+The current objective is only:
+
+«Create a functional residential floor-plan creation system that understands its own geometry, stores the plan as structured JSON, can reload it, and can export a clean PDF.»
+
+Build the foundation cleanly so additional residence-management functionality can later use the same floor-plan data.
+
+index.html in the root folder 
