@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', (e) => {
             currentRole = e.currentTarget.getAttribute('data-role');
             roleSelection.classList.add('hidden');
+            document.getElementById('welcome-text').classList.add('hidden');
             authSection.classList.remove('hidden');
             updateAuthUI();
         });
@@ -32,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnBackRoles.addEventListener('click', () => {
         authSection.classList.add('hidden');
+        document.getElementById('welcome-text').classList.remove('hidden');
         roleSelection.classList.remove('hidden');
         currentRole = null;
         authError.textContent = '';
