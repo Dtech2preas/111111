@@ -119,7 +119,14 @@ class CanvasUI {
                     this.controller.setTool('label');
                     const text = prompt("Enter label text:");
                     if (text && this.currentMousePos) {
-                        this.controller.model.addLabel(text, this.currentMousePos);
+                        let targetPos = this.currentMousePos;
+                        if (this.renderer && this.renderer.textSheetMode) {
+                            const roomHit = this.hitTest(this.currentMousePos, ['room']);
+                            if (roomHit) {
+                                targetPos = GeometryEngine.polygonCenter(roomHit.boundary);
+                            }
+                        }
+                        this.controller.model.addLabel(text, targetPos);
                         this.controller.commitAction();
                     }
                     setTimeout(() => document.querySelector('[data-tool="select"]').click(), 100);
@@ -266,6 +273,13 @@ class CanvasUI {
 
         document.getElementById('check-show-dimensions')?.addEventListener('change', () => this.render());
 
+        document.getElementById('check-text-sheet-mode')?.addEventListener('change', (e) => {
+            this.renderer.textSheetMode = e.target.checked;
+            this.selectedElement = null;
+            this.updatePropertiesPanel();
+            this.render();
+        });
+
         document.getElementById('input-grid-size').addEventListener('change', (e) => {
             this.controller.snapEngine.setGridSize(parseInt(e.target.value));
             this.render();
@@ -409,10 +423,20 @@ class CanvasUI {
                     const wallDy = hit.end.y - hit.start.y;
                     rotation = Math.atan2(wallDy, wallDx);
                 }
-                this.controller.model.addObject(this.controller.currentObjectType, pos, size, rotation);
+                const newObj = this.controller.model.addObject(this.controller.currentObjectType, pos, size, rotation);
                 this.controller.commitAction();
-                // Revert to select
+
+                // Revert to select tool and automatically start dragging
                 document.querySelector('[data-tool="select"]').click();
+
+                // Ensure controller selects the item properly
+                this.controller.selectElement(newObj.id);
+                this.selectedElement = newObj;
+                this.isDragging = true;
+                this.dragStart = pos;
+                this.initialPos = { ...newObj.position };
+                this.updatePropertiesPanel();
+                this.render();
             }
         }
         else if (this.controller.currentTool === 'measurement') {
@@ -678,6 +702,17 @@ class CanvasUI {
     // --- Hit Testing ---
 
     hitTestHandle(pos) {
+        // If Text Sheet Mode is active, disable handles for non-labels
+        if (this.renderer && this.renderer.textSheetMode) {
+             const elId = this.controller.selectedElementId;
+             if (elId) {
+                 const el = this.controller.model.getElementById(elId);
+                 if (el && el.type !== 'label') {
+                     return null;
+                 }
+             }
+        }
+
         const HIT_TOLERANCE = 25 / this.zoom;
         const elId = this.controller.selectedElementId;
         if(!elId) return null;
@@ -695,6 +730,11 @@ class CanvasUI {
     }
 
     hitTest(pos, types = ['door', 'window', 'object', 'label', 'wall', 'room']) {
+        // If Text Sheet Mode is active, restrict selection to labels only
+        if (this.renderer && this.renderer.textSheetMode) {
+            types = ['label', 'room']; // Keep room hit testing for adding new labels
+        }
+
         const HIT_TOLERANCE = 25 / this.zoom;
         const data = this.controller.model.data;
 
@@ -799,7 +839,7 @@ class CanvasUI {
             }
             this.createInputRow(panel, 'Width', el.width, (val) => this.updateProp(el.id, {width: parseFloat(val)}), false, 'number');
             if(el.height) {
-                this.createInputRow(panel, 'Height', el.height, (val) => this.updateProp(el.id, {height: parseFloat(val)}), false, 'number');
+                this.createInputRow(panel, 'Length', el.height, (val) => this.updateProp(el.id, {height: parseFloat(val)}), false, 'number');
             }
             this.createInputRow(panel, 'Rotation (deg)', (el.rotation * 180 / Math.PI).toFixed(0), (val) => {
                 this.updateProp(el.id, {rotation: parseFloat(val) * Math.PI / 180});
