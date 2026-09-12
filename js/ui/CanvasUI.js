@@ -264,6 +264,8 @@ class CanvasUI {
         document.getElementById('input-scale').value = ppm;
         document.getElementById('scale-value-display').innerText = ppm;
 
+        document.getElementById('check-show-dimensions')?.addEventListener('change', () => this.render());
+
         document.getElementById('input-grid-size').addEventListener('change', (e) => {
             this.controller.snapEngine.setGridSize(parseInt(e.target.value));
             this.render();
@@ -407,7 +409,7 @@ class CanvasUI {
                     const wallDy = hit.end.y - hit.start.y;
                     rotation = Math.atan2(wallDy, wallDx);
                 }
-                this.controller.model.addObject(this.controller.currentObjectType, snappedPos, size, rotation);
+                this.controller.model.addObject(this.controller.currentObjectType, pos, size, rotation);
                 this.controller.commitAction();
                 // Revert to select
                 document.querySelector('[data-tool="select"]').click();
@@ -725,7 +727,7 @@ class CanvasUI {
 
             if (type === 'room') {
                  for (const room of data.rooms) {
-                     if(this.pointInPolygon(pos, room.boundary)) {
+                     if(GeometryEngine.pointInPolygon(pos, room.boundary)) {
                          return room;
                      }
                  }
@@ -733,19 +735,6 @@ class CanvasUI {
         }
 
         return null;
-    }
-
-    pointInPolygon(point, vs) {
-        let x = point.x, y = point.y;
-        let inside = false;
-        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-            let xi = vs[i].x, yi = vs[i].y;
-            let xj = vs[j].x, yj = vs[j].y;
-            let intersect = ((yi > y) != (yj > y))
-                && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
     }
 
     // --- Rendering Wrapper ---
@@ -805,6 +794,9 @@ class CanvasUI {
             };
             panel.appendChild(flipBtn);
         } else if (el.type === 'window' || el.type === 'object') {
+            if (el.type === 'object') {
+                this.createInputRow(panel, 'Room', el.roomName || 'None', null, true);
+            }
             this.createInputRow(panel, 'Width', el.width, (val) => this.updateProp(el.id, {width: parseFloat(val)}), false, 'number');
             if(el.height) {
                 this.createInputRow(panel, 'Height', el.height, (val) => this.updateProp(el.id, {height: parseFloat(val)}), false, 'number');

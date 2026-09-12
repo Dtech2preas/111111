@@ -191,7 +191,8 @@ class GeometryEngine {
                     // Find the edge 'curr' coming into 'next'
                     const idx = nextNeighbors.indexOf(curr);
                     // The next edge to take is the one to the "left" (counter-clockwise)
-                    const nextNextIdx = (idx + 1) % nextNeighbors.length;
+                    let nextNextIdx = (idx - 1);
+                        if (nextNextIdx < 0) nextNextIdx += nextNeighbors.length;
                     const nextNext = nextNeighbors[nextNextIdx];
 
                     curr = next;
@@ -219,6 +220,19 @@ class GeometryEngine {
             }
         }
         return faces;
+    }
+
+    static pointInPolygon(point, vs) {
+        let x = point.x, y = point.y;
+        let inside = false;
+        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+            let xi = vs[i].x, yi = vs[i].y;
+            let xj = vs[j].x, yj = vs[j].y;
+            let intersect = ((yi > y) != (yj > y))
+                && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
     }
 
     static polygonArea(vertices) {
