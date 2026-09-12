@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-TECH Residence - 3D Demo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        .floor-control {
+            margin-bottom: 10px;
+        }
+        .floor-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .controls-group {
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        button, input {
+            padding: 5px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-container">
+        <h3>3D Floor Plan Demo</h3>
+        <div class="controls-group" id="floor-inputs">
+            <div class="floor-control">
+                <label>Upload Floor Plan (JSON)</label>
+                <input type="file" id="json-upload" accept=".json">
+            </div>
+        </div>
+        <div class="controls-group">
+            <span>Target Floor Level: </span>
+            <button id="btn-decrease-floor">-</button>
+            <span id="target-floor-display">0</span>
+            <button id="btn-increase-floor">+</button>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="js/test3d.js"></script>
+</body>
+</html>
