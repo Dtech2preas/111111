@@ -251,10 +251,18 @@ class CanvasUI {
         // Settings
         document.getElementById('input-scale').addEventListener('change', (e) => {
             const val = parseFloat(e.target.value);
-            this.controller.setScale(val);
+            // Pixels per meter to internal scale (meters per pixel)
+            const internalScale = 1 / val;
+            this.controller.setScale(internalScale);
             document.getElementById('scale-value-display').innerText = val;
             this.render();
         });
+
+        // Initialize scale display correctly
+        const currentScale = this.controller.model.data.scale;
+        const ppm = Math.round(1 / currentScale);
+        document.getElementById('input-scale').value = ppm;
+        document.getElementById('scale-value-display').innerText = ppm;
 
         document.getElementById('input-grid-size').addEventListener('change', (e) => {
             this.controller.snapEngine.setGridSize(parseInt(e.target.value));
@@ -338,7 +346,7 @@ class CanvasUI {
         }
 
         const useGrid = document.getElementById('check-snap-grid')?.checked;
-        const snappedPos = this.controller.snapEngine.snapPoint(pos, this.controller.model.data.walls, useGrid);
+        const snappedPos = this.controller.snapEngine.snapPoint(pos, this.controller.model.data.walls, useGrid, null, this.zoom);
 
         if (this.controller.currentTool === 'select') {
             // Check handles first
@@ -391,7 +399,15 @@ class CanvasUI {
         else if (this.controller.currentTool === 'object') {
             if(this.controller.currentObjectType) {
                 const size = ObjectManager.getDefaultSize(this.controller.currentObjectType);
-                this.controller.model.addObject(this.controller.currentObjectType, snappedPos, size, 0);
+                let rotation = 0;
+                // Auto-align object to nearby wall
+                const hit = this.hitTest(pos, ['wall']);
+                if (hit) {
+                    const wallDx = hit.end.x - hit.start.x;
+                    const wallDy = hit.end.y - hit.start.y;
+                    rotation = Math.atan2(wallDy, wallDx);
+                }
+                this.controller.model.addObject(this.controller.currentObjectType, snappedPos, size, rotation);
                 this.controller.commitAction();
                 // Revert to select
                 document.querySelector('[data-tool="select"]').click();
@@ -431,7 +447,7 @@ class CanvasUI {
         if(this.activeHandle) ignoreWallId = this.activeHandle.wallId;
         else if (this.isDragging) ignoreWallId = this.controller.selectedElementId;
 
-        this.snapPoint = this.controller.snapEngine.snapPoint(pos, this.controller.model.data.walls, useGrid, ignoreWallId);
+        this.snapPoint = this.controller.snapEngine.snapPoint(pos, this.controller.model.data.walls, useGrid, ignoreWallId, this.zoom);
 
         if (this.activeHandle && this.controller.selectedElementId) {
             let finalPos = this.snapPoint;
@@ -472,11 +488,28 @@ class CanvasUI {
 
                 // Snap door/window to wall if nearby
                 if(el.type === 'door' || el.type === 'window') {
+                    const HIT_TOLERANCE_DRAG = 40 / this.zoom;
+                    let closestWall = null;
+                    let minDist = HIT_TOLERANCE_DRAG;
+                    for (const wall of this.controller.model.data.walls) {
+                        const dist = GeometryEngine.distanceToSegment(pos, wall.start, wall.end);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closestWall = wall;
+                        }
+                    }
+                    if(closestWall) {
+                        const projected = GeometryEngine.projectPointOnLine(pos, closestWall.start, closestWall.end);
+                        el.position = projected;
+                        el.wallId = closestWall.id;
+                        const wallDx = closestWall.end.x - closestWall.start.x;
+                        const wallDy = closestWall.end.y - closestWall.start.y;
+                        el.rotation = Math.atan2(wallDy, wallDx);
+                    }
+                } else if (el.type === 'object') {
+                    // Soft-snap furniture rotation to walls when dragging
                     const hit = this.hitTest(pos, ['wall']);
                     if(hit) {
-                        const projected = GeometryEngine.projectPointOnLine(pos, hit.start, hit.end);
-                        el.position = projected;
-                        el.wallId = hit.id;
                         const wallDx = hit.end.x - hit.start.x;
                         const wallDy = hit.end.y - hit.start.y;
                         el.rotation = Math.atan2(wallDy, wallDx);
@@ -643,7 +676,7 @@ class CanvasUI {
     // --- Hit Testing ---
 
     hitTestHandle(pos) {
-        const HIT_TOLERANCE = 15 / this.zoom;
+        const HIT_TOLERANCE = 25 / this.zoom;
         const elId = this.controller.selectedElementId;
         if(!elId) return null;
 
@@ -660,7 +693,7 @@ class CanvasUI {
     }
 
     hitTest(pos, types = ['door', 'window', 'object', 'label', 'wall', 'room']) {
-        const HIT_TOLERANCE = 15 / this.zoom;
+        const HIT_TOLERANCE = 25 / this.zoom;
         const data = this.controller.model.data;
 
         for (const type of types) {

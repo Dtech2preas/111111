@@ -1,7 +1,7 @@
 class SnapEngine {
     constructor(gridSize = 50) {
         this.gridSize = gridSize;
-        this.snapTolerance = 15;
+        this.snapTolerance = 25;
     }
 
     setGridSize(size) {
@@ -15,14 +15,14 @@ class SnapEngine {
         };
     }
 
-    snapPoint(point, walls, useGrid = false, ignoreWallId = null) {
+    snapPoint(point, walls, useGrid = false, ignoreWallId = null, zoom = 1) {
         let closest = null;
-        let minDistance = this.snapTolerance;
+        let minDistance = this.snapTolerance / zoom;
 
+        // First pass: snap to endpoints (prioritize corners)
         for (const wall of walls) {
             if (ignoreWallId && wall.id === ignoreWallId) continue;
 
-            // Snap to endpoints
             const dStart = GeometryEngine.distance(point, wall.start);
             if (dStart < minDistance) {
                 minDistance = dStart;
@@ -34,11 +34,15 @@ class SnapEngine {
                 minDistance = dEnd;
                 closest = { x: wall.end.x, y: wall.end.y };
             }
+        }
 
-            // Snap to line segment
-            if (!closest) {
+        // Second pass: if no endpoint is found, snap to line segment
+        if (!closest) {
+            minDistance = this.snapTolerance / zoom;
+            for (const wall of walls) {
+                if (ignoreWallId && wall.id === ignoreWallId) continue;
+
                 const pLine = GeometryEngine.projectPointOnLine(point, wall.start, wall.end);
-                // Ensure projection is actually on the segment
                 const dLine = GeometryEngine.distance(point, pLine);
                 if (dLine < minDistance) {
                     minDistance = dLine;
