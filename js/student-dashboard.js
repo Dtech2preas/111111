@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const li = document.createElement('li');
             const icon = issue.severity === 'critical' ? '🔴' : '🟡';
             li.className = `alert-item ${issue.severity === 'critical' ? 'red' : 'yellow'}`;
-            li.innerHTML = `${icon} <strong>${issue.elementName}</strong> is currently unavailable: ${issue.description}`;
+            li.innerHTML = `${icon} <strong>${issue.elementName}</strong> (Floor ${issue.floorLevel !== undefined ? issue.floorLevel : "?"}, ${issue.roomName || "Unknown"}) is currently unavailable: ${issue.description}`;
             studentAlertsEl.appendChild(li);
         });
     });

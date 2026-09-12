@@ -121,7 +121,20 @@
                 <canvas id="floorplan-canvas"></canvas>
             </div>
 
+
             <aside class="sidebar-right" id="sidebar-right">
+                <h3>Floors</h3>
+                <div class="settings-group" style="margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <button id="btn-floor-down" class="btn-text" style="padding: 5px 10px; font-size: 16px;">▼</button>
+                        <span id="current-floor-display" style="font-weight: bold; font-size: 16px;">Ground Floor (0)</span>
+                        <button id="btn-floor-up" class="btn-text" style="padding: 5px 10px; font-size: 16px;">▲</button>
+                    </div>
+                    <label class="checkbox-label" id="use-outline-container" style="display: none;">
+                        <input type="checkbox" id="check-use-outline"> Use Ground Floor Outline
+                    </label>
+                </div>
+
                 <h3>Rooms</h3>
                 <div id="rooms-list" class="rooms-list">
                     <p class="placeholder-text">No rooms detected</p>

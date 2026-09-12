@@ -286,6 +286,44 @@ class CanvasUI {
             });
         }
 
+
+        // Floor Controls
+        const btnFloorDown = document.getElementById('btn-floor-down');
+        const btnFloorUp = document.getElementById('btn-floor-up');
+        const floorDisplay = document.getElementById('current-floor-display');
+        const useOutlineContainer = document.getElementById('use-outline-container');
+        const checkUseOutline = document.getElementById('check-use-outline');
+
+        if (btnFloorDown && btnFloorUp && floorDisplay) {
+            btnFloorDown.addEventListener('click', () => {
+                if (this.controller.currentFloorLevel > 0) {
+                    const newLevel = this.controller.currentFloorLevel - 1;
+                    this.controller.setFloor(newLevel, false);
+                }
+            });
+
+            btnFloorUp.addEventListener('click', () => {
+                const newLevel = this.controller.currentFloorLevel + 1;
+                const useOutline = checkUseOutline ? checkUseOutline.checked : false;
+                this.controller.setFloor(newLevel, useOutline);
+            });
+
+            this.controller.on('floor_changed', (level) => {
+                if (level === 0) {
+                    floorDisplay.innerText = "Ground Floor (0)";
+                    if (useOutlineContainer) useOutlineContainer.style.display = 'none';
+                } else {
+                    floorDisplay.innerText = `Floor ${level}`;
+                    if (useOutlineContainer) useOutlineContainer.style.display = 'block';
+                }
+            });
+
+            // Initial check
+            if (this.controller.currentFloorLevel > 0 && useOutlineContainer) {
+                useOutlineContainer.style.display = 'block';
+            }
+        }
+
         // Settings
         document.getElementById('input-scale').addEventListener('change', (e) => {
             const val = parseFloat(e.target.value);
@@ -933,7 +971,7 @@ class CanvasUI {
                         return;
                     }
                     const elName = el.name || (el.type === 'object' ? ObjectManager.getObjectDefinition(el.category, el.objType).name : el.type);
-                    window.FirebaseStorageManager.markIssue(residenceId, el.id, elName, faultInput.value);
+                    window.FirebaseStorageManager.markIssue(residenceId, el.id, elName, faultInput.value, "critical", this.controller.currentFloorLevel, el.roomName || "None");
                 };
 
                 issueSection.appendChild(faultInput);

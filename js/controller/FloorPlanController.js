@@ -12,6 +12,7 @@ class FloorPlanController extends EventEmitter {
         this.currentTool = 'select';
         this.selectedElementId = null;
         this.currentObjectType = null; // For furniture tool
+        this.currentFloorLevel = 0;
 
         // Alerts / Issues
         this.activeIssues = {};
@@ -61,6 +62,51 @@ class FloorPlanController extends EventEmitter {
         this.model.data.scale = scale;
         this.emit('scale_changed', scale);
         this.updateRooms(); // Recompute areas based on new scale
+    }
+
+
+    async setFloor(level, useGroundOutline = false) {
+        if (this.currentFloorLevel === level) return;
+
+        // Save current floor first before switching
+        await this.saveLocal();
+
+        const previousFloorData = this.model.cloneData();
+        this.currentFloorLevel = level;
+
+        const loaded = await this.loadLocal();
+        if (!loaded) {
+            this.model.reset();
+
+            // Apply ground floor outline if requested
+            if (useGroundOutline && level > 0) {
+                // Fetch ground floor
+                const residenceId = localStorage.getItem('dtech_residence_id');
+                let groundFloorJson = null;
+                if (residenceId && window.FirebaseStorageManager) {
+                    groundFloorJson = await window.FirebaseStorageManager.loadFromFirebase(residenceId, 0);
+                }
+
+                if (groundFloorJson) {
+                    try {
+                        const groundData = typeof groundFloorJson === 'string' ? JSON.parse(groundFloorJson) : groundFloorJson;
+                        // Clone external walls (simplify: just copy all walls for now as a starting point)
+                        if (groundData.walls) {
+                            groundData.walls.forEach(w => {
+                                this.model.addWall(w.start, w.end, w.thickness);
+                            });
+                        }
+                    } catch(e) {
+                        console.error("Failed to load ground floor outline", e);
+                    }
+                }
+            }
+            this.historyEngine.clear();
+            this.historyEngine.saveState(this.model.data);
+        }
+
+        this.emit('floor_changed', level);
+        this.emit('model_changed');
     }
 
     // --- Actions ---
@@ -160,7 +206,7 @@ class FloorPlanController extends EventEmitter {
     async saveLocal() {
         const residenceId = localStorage.getItem('dtech_residence_id');
         if (residenceId && window.FirebaseStorageManager) {
-            return await window.FirebaseStorageManager.saveToFirebase(residenceId, this.model.toJSON());
+            return await window.FirebaseStorageManager.saveToFirebase(residenceId, this.model.toJSON(), this.currentFloorLevel);
         }
         return StorageManager.saveLocal(this.model.toJSON());
     }
@@ -170,7 +216,7 @@ class FloorPlanController extends EventEmitter {
         let json = null;
 
         if (residenceId && window.FirebaseStorageManager) {
-            json = await window.FirebaseStorageManager.loadFromFirebase(residenceId);
+            json = await window.FirebaseStorageManager.loadFromFirebase(residenceId, this.currentFloorLevel);
         }
 
         if (!json) {

@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const issue = doc.data();
             const li = document.createElement('li');
             li.className = `alert-item ${issue.severity === 'critical' ? 'red' : 'yellow'}`;
-            li.innerHTML = `<strong>${issue.elementName}</strong>: ${issue.description}`;
+            li.innerHTML = `<strong>${issue.elementName}</strong> (Floor ${issue.floorLevel !== undefined ? issue.floorLevel : "?"}, ${issue.roomName || "Unknown"}): ${issue.description}`;
             managerAlertsEl.appendChild(li);
         });
     });

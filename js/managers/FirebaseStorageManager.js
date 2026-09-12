@@ -3,14 +3,14 @@ import { db } from "../firebase-config.js";
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
 export class FirebaseStorageManager {
-    static async saveToFirebase(residenceId, floorPlanData) {
+    static async saveToFirebase(residenceId, floorPlanData, floorLevel = 0) {
         if (!residenceId) {
             console.warn("No residenceId found. Skipping Firebase save.");
             return false;
         }
 
         try {
-            const planRef = doc(db, "residences", residenceId, "floorPlans", "main");
+            const planRef = doc(db, "residences", residenceId, "floorPlans", `floor_${floorLevel}`);
             await setDoc(planRef, {
                 data: floorPlanData,
                 updatedAt: new Date().toISOString()
@@ -23,11 +23,11 @@ export class FirebaseStorageManager {
         }
     }
 
-    static async loadFromFirebase(residenceId) {
+    static async loadFromFirebase(residenceId, floorLevel = 0) {
         if (!residenceId) return null;
 
         try {
-            const planRef = doc(db, "residences", residenceId, "floorPlans", "main");
+            const planRef = doc(db, "residences", residenceId, "floorPlans", `floor_${floorLevel}`);
             const snapshot = await getDoc(planRef);
             if (snapshot.exists()) {
                 return snapshot.data().data;
@@ -38,10 +38,32 @@ export class FirebaseStorageManager {
         return null;
     }
 
-    static listenToFloorPlan(residenceId, callback) {
+    static async getAllFloors(residenceId) {
+        if (!residenceId) return {};
+        try {
+            const { collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js");
+            const plansRef = collection(db, "residences", residenceId, "floorPlans");
+            const snapshot = await getDocs(plansRef);
+            const floors = {};
+            snapshot.forEach(doc => {
+                const match = doc.id.match(/^floor_(\d+)$/);
+                if (match) {
+                    floors[parseInt(match[1])] = doc.data().data;
+                } else if (doc.id === 'main') {
+                    floors[0] = doc.data().data; // Fallback for old data
+                }
+            });
+            return floors;
+        } catch (e) {
+            console.error("Failed to load all floors:", e);
+            return {};
+        }
+    }
+
+    static listenToFloorPlan(residenceId, floorLevel = 0, callback) {
         if (!residenceId) return () => {};
 
-        const planRef = doc(db, "residences", residenceId, "floorPlans", "main");
+        const planRef = doc(db, "residences", residenceId, "floorPlans", `floor_${floorLevel}`);
         return onSnapshot(planRef, (snapshot) => {
             if (snapshot.exists()) {
                 callback(snapshot.data().data);
@@ -50,7 +72,7 @@ export class FirebaseStorageManager {
     }
 
     // --- Issues / Alerts ---
-    static async markIssue(residenceId, elementId, elementName, description, severity = 'critical') {
+    static async markIssue(residenceId, elementId, elementName, description, severity = 'critical', floorLevel = 0, roomName = 'Unassigned') {
         if (!residenceId) return;
         try {
             const issueRef = doc(db, "residences", residenceId, "issues", elementId);
@@ -59,6 +81,8 @@ export class FirebaseStorageManager {
                 elementName,
                 description,
                 severity,
+                floorLevel,
+                roomName,
                 timestamp: new Date().toISOString()
             });
         } catch (e) {
