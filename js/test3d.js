@@ -166,15 +166,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 for(let i=0; i<=maxFloor; i++) {
                     if (floors[i]) {
                         buildFloor(floors[i], i);
+                        if (i !== targetFloorLevel) {
+                            if (floorGroups[i]) floorGroups[i].visible = false;
+                        } else {
+                            latestFloorData = floors[i];
+                            if (floorGroups[i]) floorGroups[i].visible = true;
+                        }
                     }
                 }
 
                 if (floorLevels.length === 0) {
                      // Fallback
-                     const localData = localStorage.getItem('dtech_floorplan_v2');
-                     if (localData) {
-                         latestFloorData = JSON.parse(localData);
-                         buildFloor(latestFloorData, targetFloorLevel);
+                     for(let i=0; i<=10; i++) {
+                          const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
+                          if (localData) {
+                              buildFloor(JSON.parse(localData), i);
+                              if (i === targetFloorLevel) {
+                                  latestFloorData = JSON.parse(localData);
+                              } else {
+                                  if (floorGroups[i]) floorGroups[i].visible = false;
+                              }
+                          }
                      }
                 }
 
@@ -185,10 +197,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }).catch(e => {
                 // local fallback if network error
-                const localData = localStorage.getItem('dtech_floorplan_v2');
-                if (localData) {
-                    latestFloorData = JSON.parse(localData);
-                    buildFloor(latestFloorData, targetFloorLevel);
+                for(let i=0; i<=10; i++) {
+                     const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
+                     if (localData) {
+                         buildFloor(JSON.parse(localData), i);
+                         if (i === targetFloorLevel) {
+                             latestFloorData = JSON.parse(localData);
+                             if (floorGroups[i]) floorGroups[i].visible = true;
+                         } else {
+                             if (floorGroups[i]) floorGroups[i].visible = false;
+                         }
+                     }
                 }
             });
 
@@ -204,10 +223,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else {
             // Load from local storage fallback
-            const localData = localStorage.getItem('dtech_floorplan_v2');
-            if (localData) {
-                latestFloorData = JSON.parse(localData);
-                buildFloor(latestFloorData, targetFloorLevel);
+            for(let i=0; i<=10; i++) {
+                 const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
+                 if (localData) {
+                     buildFloor(JSON.parse(localData), i);
+                     if (i === targetFloorLevel) {
+                         latestFloorData = JSON.parse(localData);
+                     } else {
+                         if (floorGroups[i]) floorGroups[i].visible = false;
+                     }
+                 }
             }
         }
     }, 500);
@@ -218,6 +243,66 @@ document.addEventListener('DOMContentLoaded', () => {
     // UI Listeners
     const targetFloorDisplay = document.getElementById('target-floor-display');
 
+    // Add display all floors toggle
+    const controlsGroup = document.querySelector('#btn-increase-floor').parentElement;
+    const btnDisplayAll = document.createElement('button');
+    btnDisplayAll.id = 'btn-display-all-floors';
+    btnDisplayAll.innerText = 'Display All Floors';
+    controlsGroup.appendChild(btnDisplayAll);
+
+    let isDisplayingAllFloors = false;
+    btnDisplayAll.addEventListener('click', () => {
+        isDisplayingAllFloors = !isDisplayingAllFloors;
+        btnDisplayAll.innerText = isDisplayingAllFloors ? 'Hide All Floors' : 'Display All Floors';
+
+        if (isDisplayingAllFloors) {
+             // Show all floors by making them visible and rendering them if they haven't been built yet
+             const residenceId = localStorage.getItem('dtech_residence_id');
+             if (window.FirebaseStorageManager && residenceId) {
+                  window.FirebaseStorageManager.getAllFloors(residenceId).then(floors => {
+                      Object.keys(floors).forEach(level => {
+                          if (!floorGroups[level]) {
+                               buildFloor(floors[level], parseInt(level));
+                          }
+                          floorGroups[level].visible = true;
+                      });
+                  }).catch(e => {
+                      // local fallback
+                      for(let i=0; i<=10; i++) {
+                           const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
+                           if (localData) {
+                               if (!floorGroups[i]) {
+                                    buildFloor(JSON.parse(localData), i);
+                               }
+                               if (floorGroups[i]) floorGroups[i].visible = true;
+                           }
+                      }
+                  });
+             } else {
+                  // local fallback
+                  for(let i=0; i<=10; i++) {
+                       const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
+                       if (localData) {
+                           if (!floorGroups[i]) {
+                                buildFloor(JSON.parse(localData), i);
+                           }
+                           if (floorGroups[i]) floorGroups[i].visible = true;
+                       }
+                  }
+             }
+        } else {
+             // Hide all except current
+             Object.keys(floorGroups).forEach(level => {
+                  if (parseInt(level) !== targetFloorLevel) {
+                       floorGroups[level].visible = false;
+                  } else {
+                       floorGroups[level].visible = true;
+                  }
+             });
+        }
+    });
+
+
     document.getElementById('btn-decrease-floor').addEventListener('click', () => {
         if (targetFloorLevel > 0) {
             targetFloorLevel--;
@@ -226,6 +311,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const p = camera.position;
             orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
             orbitControls.update();
+
+            // Ensure floor is built from local storage ONLY IF it's not already built
+            if (!floorGroups[targetFloorLevel]) {
+                const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + targetFloorLevel);
+                if (localData) {
+                    latestFloorData = JSON.parse(localData);
+                    buildFloor(latestFloorData, targetFloorLevel);
+                }
+            }
+
+            if (!isDisplayingAllFloors) {
+                 Object.keys(floorGroups).forEach(level => {
+                      floorGroups[level].visible = (parseInt(level) === targetFloorLevel);
+                 });
+            } else {
+                if(floorGroups[targetFloorLevel]) {
+                    floorGroups[targetFloorLevel].visible = true;
+                }
+            }
         }
     });
 
@@ -236,6 +340,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = camera.position;
         orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
         orbitControls.update();
+
+        // Ensure floor is built from local storage ONLY IF it's not already built
+        if (!floorGroups[targetFloorLevel]) {
+            const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + targetFloorLevel);
+            if (localData) {
+                latestFloorData = JSON.parse(localData);
+                buildFloor(latestFloorData, targetFloorLevel);
+            }
+        }
+
+        if (!isDisplayingAllFloors) {
+             Object.keys(floorGroups).forEach(level => {
+                  floorGroups[level].visible = (parseInt(level) === targetFloorLevel);
+             });
+        } else {
+            if(floorGroups[targetFloorLevel]) {
+                floorGroups[targetFloorLevel].visible = true;
+            }
+        }
     });
     document.getElementById('json-upload').addEventListener('change', (event) => {
         const file = event.target.files[0];
@@ -277,6 +400,31 @@ document.addEventListener('DOMContentLoaded', () => {
             floorInputs.style.display = 'none';
         }
     }
+
+    // For students/guests, we should also auto-trigger the floor load process since they can't upload JSON
+    // The load happens on setTimeout below, but let's make sure it handles student fallback properly.
+    if (urlParams.get('readonly') === 'true' || isGuest || isStudent) {
+        setTimeout(() => {
+            // Fallback load all existing floors from local storage if not already loaded
+            if (!latestFloorData) {
+                 for(let i=0; i<=10; i++) {
+                     const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
+                     if (localData) {
+                         if (!floorGroups[i]) {
+                             buildFloor(JSON.parse(localData), i);
+                         }
+                         if (i === targetFloorLevel) {
+                             latestFloorData = JSON.parse(localData);
+                             if (floorGroups[i]) floorGroups[i].visible = true;
+                         } else {
+                             if (floorGroups[i]) floorGroups[i].visible = false;
+                         }
+                     }
+                 }
+            }
+        }, 1000);
+    }
+
 
     const walkBtn = document.getElementById('btn-walk-mode');
     const walkInstr = document.getElementById('walk-instructions');
