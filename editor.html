@@ -1,41 +1,208 @@
-import asyncio
-from playwright.async_api import async_playwright
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>D-TECH Residence Floor Plan System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Third-party library for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="header-title">
+                <a href="javascript:history.back()" style="color: white; margin-right: 15px; text-decoration: none; font-size: 14px;">← Back</a>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <h1>D-TECH Floor Plan</h1>
+            </div>
 
-async def main():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        page = await browser.new_page(viewport={"width": 1280, "height": 720})
+            <div class="toolbar-global">
+                <button id="btn-new" title="New Floor Plan">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                    <span>New</span>
+                </button>
+                <button id="btn-save" title="Save (Local)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span>Save</span>
+                </button>
+                <button id="btn-load" title="Load (Local)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Load</span>
+                </button>
+                <span class="separator">|</span>
+                <button id="btn-import" title="Import JSON">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    <span>Import JSON</span>
+                </button>
+                <button id="btn-export-json" title="Export JSON">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Export JSON</span>
+                </button>
+                <button id="btn-test-3d" title="Test 3D Demo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                    <span>Test 3D Demo</span>
+                </button>
+                <button id="btn-export-pdf" title="Export PDF">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Export PDF</span>
+                </button>
+                <span class="separator">|</span>
+                <button id="btn-undo" disabled title="Undo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                </button>
+                <button id="btn-redo" disabled title="Redo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                </button>
+            </div>
 
-        await page.goto("http://localhost:8000/editor.html")
-        await page.wait_for_selector("#floorplan-canvas")
+            <button id="btn-mobile-menu" class="mobile-only">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+        </header>
 
-        # Select wall tool
-        await page.click("button:has-text('Draw Wall')")
+        <main>
+            <aside class="sidebar-left" id="sidebar-left">
+                <h3>Tools</h3>
+                <div class="tool-group">
+                    <button class="tool-btn active" data-tool="select">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg>
+                        <span>Select / Move</span>
+                    </button>
+                    <button class="tool-btn" data-tool="wall">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        <span>Draw Wall</span>
+                    </button>
+                    <button class="tool-btn" data-tool="door">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"></path><path d="M2 20h20"></path><path d="M14 12v.01"></path></svg>
+                        <span>Add Door</span>
+                    </button>
+                    <button class="tool-btn" data-tool="window">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+                        <span>Add Window</span>
+                    </button>
+                    <button class="tool-btn" data-tool="object">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                        <span>Add Furniture</span>
+                    </button>
+                    <button class="tool-btn" data-tool="label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+                        <span>Add Text</span>
+                    </button>
+                    <button class="tool-btn" data-tool="measurement">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><line x1="6" y1="6" x2="6" y2="9"></line><line x1="10" y1="6" x2="10" y2="9"></line><line x1="14" y1="6" x2="14" y2="9"></line><line x1="18" y1="6" x2="18" y2="9"></line></svg>
+                        <span>Measure</span>
+                    </button>
+                    <button class="tool-btn btn-danger" data-tool="delete">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <span>Delete</span>
+                    </button>
+                </div>
 
-        # Get canvas bounding box
-        canvas = await page.query_selector("#floorplan-canvas")
-        box = await canvas.bounding_box()
+                <div id="object-palette" class="palette hidden">
+                    <h4>Furniture</h4>
+                    <select id="object-category-select">
+                        <option value="bedroom">Bedroom</option>
+                        <option value="living">Living Room</option>
+                        <option value="kitchen">Kitchen</option>
+                        <option value="bathroom">Bathroom</option>
+                    </select>
+                    <div id="object-list" class="object-list"></div>
+                </div>
 
-        # Click on canvas to establish focus and start drawing wall
-        start_x = box["x"] + 100
-        start_y = box["y"] + 100
-        await page.mouse.click(start_x, start_y)
+                <h3>Properties</h3>
+                <div id="properties-panel" class="properties-panel">
+                    <p class="placeholder-text">Select an element to view properties</p>
+                </div>
 
-        # Move mouse to draw
-        end_x = start_x + 200
-        end_y = start_y
-        await page.mouse.move(end_x, end_y)
+            </aside>
 
-        # Type "5"
-        await page.keyboard.press("5")
+            <div class="canvas-container">
+                <canvas id="floorplan-canvas"></canvas>
+            </div>
 
-        # Wait for input to be visible and have value
-        await page.wait_for_timeout(500)
 
-        # Take screenshot of input state
-        await page.screenshot(path="wall_preview_typing3.png")
+            <aside class="sidebar-right" id="sidebar-right">
+                <h3>Floors</h3>
+                <div class="settings-group" style="margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <button id="btn-floor-down" class="btn-text" style="padding: 5px 10px; font-size: 16px;">▼</button>
+                        <span id="current-floor-display" style="font-weight: bold; font-size: 16px;">Ground Floor (0)</span>
+                        <button id="btn-floor-up" class="btn-text" style="padding: 5px 10px; font-size: 16px;">▲</button>
+                    </div>
+                    <label class="checkbox-label" id="use-outline-container" style="display: none;">
+                        <input type="checkbox" id="check-use-outline"> Use Ground Floor Outline
+                    </label>
+                </div>
 
-        await browser.close()
+                <h3>Rooms</h3>
+                <div id="rooms-list" class="rooms-list">
+                    <p class="placeholder-text">No rooms detected</p>
+                </div>
 
-if __name__ == "__main__":
-    asyncio.run(main())
+                <h3>Settings</h3>
+                <div class="settings-group">
+                    <label>
+                        Scale (<span id="scale-value-display">100</span> Pixels per Meter):
+                        <input type="number" id="input-scale" value="100" step="1" min="10">
+                    </label>
+                    <label>
+                        Grid Size:
+                        <input type="number" id="input-grid-size" value="50" step="10" min="10">
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="check-snap-grid"> Snap to Grid
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="check-snap-angle" checked> Snap to 45°
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="check-show-dimensions"> Show Dimensions
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="check-text-sheet-mode"> Text Sheet Mode
+                    </label>
+                </div>
+            </aside>
+        </main>
+
+        <footer>
+            <div id="status-bar">Ready</div>
+            <div id="coordinates">X: 0, Y: 0</div>
+            <div id="zoom-controls">
+                <button id="btn-zoom-out" title="Zoom Out">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <span id="zoom-level">100%</span>
+                <button id="btn-zoom-in" title="Zoom In">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <button id="btn-zoom-fit" title="Fit to Screen">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                </button>
+                <button id="btn-zoom-reset" title="Reset Zoom">Reset</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils/EventEmitter.js"></script>
+    <script type="module">
+        import { FirebaseStorageManager } from './js/managers/FirebaseStorageManager.js';
+        window.FirebaseStorageManager = FirebaseStorageManager;
+    </script>
+    <script src="js/managers/StorageManager.js"></script>
+    <script src="js/managers/ObjectManager.js"></script>
+    <script src="js/engines/HistoryEngine.js"></script>
+    <script src="js/engines/RoomDetection.js"></script>
+    <script src="js/engines/SnapEngine.js"></script>
+    <script src="js/engines/MeasurementEngine.js"></script>
+    <script src="js/geometry/GeometryEngine.js"></script>
+    <script src="js/model/FloorPlanModel.js"></script>
+    <script src="js/renderers/CanvasRenderer.js"></script>
+    <script src="js/controller/FloorPlanController.js"></script>
+    <script src="js/ui/CanvasUI.js"></script>
+    <script src="js/export/PDFExporter.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
