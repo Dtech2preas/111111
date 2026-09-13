@@ -1,3 +1,43 @@
+
+if (!window.safeParse) {
+    window.safeParse = (data) => {
+        let parsed = data;
+        while (typeof parsed === 'string') {
+            try {
+                parsed = JSON.parse(parsed);
+            } catch(e) {
+                console.error("Failed to parse data:", e);
+                return null;
+            }
+        }
+        return parsed;
+    };
+}
+
+if (!window.fetchFloorData) {
+    window.fetchFloorData = async (level) => {
+        const residenceId = localStorage.getItem('dtech_residence_id');
+        if (window.FirebaseStorageManager && residenceId) {
+            try {
+                const fbData = await window.FirebaseStorageManager.loadFromFirebase(residenceId, level);
+                if (fbData) {
+                    console.log(`Fetched floor ${level} from Firebase`);
+                    return window.safeParse(fbData);
+                }
+            } catch (e) {
+                console.error("Firebase fetch error:", e);
+            }
+        }
+        // Fallback to local storage ONLY if firebase fails or is unavailable
+        const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + level);
+        if (localData) {
+             console.log(`Fetched floor ${level} from localStorage`);
+             return window.safeParse(localData);
+        }
+        return null;
+    };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Basic Three.js setup
     const container = document.getElementById('canvas-container');
@@ -188,15 +228,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (floorLevels.length === 0) {
                      // Fallback
                      for(let i=0; i<=10; i++) {
-                          const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                          if (localData) {
-                              buildFloor(JSON.parse(localData), i);
-                              if (i === targetFloorLevel) {
-                                  latestFloorData = JSON.parse(localData);
-                              } else {
-                                  if (floorGroups[i]) floorGroups[i].visible = false;
+                          window.fetchFloorData(i).then(data => {
+                              if (data) {
+                                  buildFloor(data, i);
+                                  if (i === targetFloorLevel) {
+                                      latestFloorData = data;
+                                  } else {
+                                      if (floorGroups[i]) floorGroups[i].visible = false;
+                                  }
                               }
-                          }
+                          });
                      }
                 }
 
@@ -208,16 +249,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(e => {
                 // local fallback if network error
                 for(let i=0; i<=10; i++) {
-                     const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                     if (localData) {
-                         buildFloor(JSON.parse(localData), i);
-                         if (i === targetFloorLevel) {
-                             latestFloorData = JSON.parse(localData);
-                             if (floorGroups[i]) floorGroups[i].visible = true;
-                         } else {
-                             if (floorGroups[i]) floorGroups[i].visible = false;
+                     window.fetchFloorData(i).then(data => {
+                         if (data) {
+                             buildFloor(data, i);
+                             if (i === targetFloorLevel) {
+                                 latestFloorData = data;
+                                 if (floorGroups[i]) floorGroups[i].visible = true;
+                             } else {
+                                 if (floorGroups[i]) floorGroups[i].visible = false;
+                             }
                          }
-                     }
+                     });
                 }
             });
 
@@ -234,15 +276,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Load from local storage fallback
             for(let i=0; i<=10; i++) {
-                 const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                 if (localData) {
-                     buildFloor(JSON.parse(localData), i);
-                     if (i === targetFloorLevel) {
-                         latestFloorData = JSON.parse(localData);
-                     } else {
-                         if (floorGroups[i]) floorGroups[i].visible = false;
+                 window.fetchFloorData(i).then(data => {
+                     if (data) {
+                         buildFloor(data, i);
+                         if (i === targetFloorLevel) {
+                             latestFloorData = data;
+                         } else {
+                             if (floorGroups[i]) floorGroups[i].visible = false;
+                         }
                      }
-                 }
+                 });
             }
         }
     };
@@ -280,25 +323,27 @@ document.addEventListener('DOMContentLoaded', () => {
                   }).catch(e => {
                       // local fallback
                       for(let i=0; i<=10; i++) {
-                           const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                           if (localData) {
-                               if (!floorGroups[i]) {
-                                    buildFloor(JSON.parse(localData), i);
+                           window.fetchFloorData(i).then(data => {
+                               if (data) {
+                                   if (!floorGroups[i]) {
+                                        buildFloor(data, i);
+                                   }
+                                   if (floorGroups[i]) floorGroups[i].visible = true;
                                }
-                               if (floorGroups[i]) floorGroups[i].visible = true;
-                           }
+                           });
                       }
                   });
              } else {
                   // local fallback
                   for(let i=0; i<=10; i++) {
-                       const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                       if (localData) {
-                           if (!floorGroups[i]) {
-                                buildFloor(JSON.parse(localData), i);
+                       window.fetchFloorData(i).then(data => {
+                           if (data) {
+                               if (!floorGroups[i]) {
+                                    buildFloor(data, i);
+                               }
+                               if (floorGroups[i]) floorGroups[i].visible = true;
                            }
-                           if (floorGroups[i]) floorGroups[i].visible = true;
-                       }
+                       });
                   }
              }
         } else {
@@ -323,13 +368,15 @@ document.addEventListener('DOMContentLoaded', () => {
             orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
             orbitControls.update();
 
-            // Ensure floor is built from local storage ONLY IF it's not already built
+            // Ensure floor is built ONLY IF it's not already built
             if (!floorGroups[targetFloorLevel]) {
-                const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + targetFloorLevel);
-                if (localData) {
-                    latestFloorData = JSON.parse(localData);
-                    buildFloor(latestFloorData, targetFloorLevel);
-                }
+                window.fetchFloorData(targetFloorLevel).then(data => {
+                    if (data) {
+                        latestFloorData = data;
+                        buildFloor(latestFloorData, targetFloorLevel);
+                        if (!isDisplayingAllFloors && floorGroups[targetFloorLevel]) floorGroups[targetFloorLevel].visible = true;
+                    }
+                });
             }
 
             if (!isDisplayingAllFloors) {
@@ -352,13 +399,15 @@ document.addEventListener('DOMContentLoaded', () => {
         orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
         orbitControls.update();
 
-        // Ensure floor is built from local storage ONLY IF it's not already built
+        // Ensure floor is built ONLY IF it's not already built
         if (!floorGroups[targetFloorLevel]) {
-            const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + targetFloorLevel);
-            if (localData) {
-                latestFloorData = JSON.parse(localData);
-                buildFloor(latestFloorData, targetFloorLevel);
-            }
+            window.fetchFloorData(targetFloorLevel).then(data => {
+                if (data) {
+                    latestFloorData = data;
+                    buildFloor(latestFloorData, targetFloorLevel);
+                    if (!isDisplayingAllFloors && floorGroups[targetFloorLevel]) floorGroups[targetFloorLevel].visible = true;
+                }
+            });
         }
 
         if (!isDisplayingAllFloors) {
@@ -445,6 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const floorGroups = {};
 
     function buildFloor(data, level) {
+        data = window.safeParse(data);
         if (!data || !data.walls) return;
 
         // Clear existing walls for this floor
