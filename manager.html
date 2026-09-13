@@ -17,40 +17,42 @@
         </header>
 
         <main>
-            <h2 id="residence-name">My Residence</h2>
+            <h2 id="residence-name" style="margin-bottom: 24px; color: #0f172a;">My Residence</h2>
 
             <div class="dashboard-grid">
                 <div class="card">
                     <h3>Floor Plans</h3>
                     <p>Manage floors, rooms, and appliances.</p>
-                    <button id="btn-open-editor" class="btn-primary" onclick="window.location.href='edit.html'" style="margin-bottom: 10px;">Open Editor</button>
-                    <button class="btn-primary" onclick="window.location.href='test3d.html'" style="margin-bottom: 10px; background-color: #6f42c1;">View 3D Residence</button>
-                    <button id="btn-manage-appliances" class="btn-primary" onclick="window.location.href='appliance-status.html'" style="background: #17a2b8;">Manage Appliances</button>
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: auto;">
+                        <button id="btn-open-editor" class="btn-primary" onclick="window.location.href='edit.html'" style="margin: 0;">Open Editor</button>
+                        <button class="btn-primary" onclick="window.location.href='test3d.html'" style="margin: 0; background-color: #8b5cf6;">View 3D Residence</button>
+                        <button id="btn-manage-appliances" class="btn-primary" onclick="window.location.href='appliance-status.html'" style="margin: 0; background: #0ea5e9;">Manage Appliances</button>
+                    </div>
                 </div>
 
-                <div class="card">
+                <div class="card" style="grid-column: span 1; grid-row: span 2;">
                     <h3>Issues / Alerts</h3>
-                    <ul class="alert-list" id="manager-alerts">
+                    <ul class="alert-list" id="manager-alerts" style="flex-grow: 1; overflow-y: auto;">
                         <li class="alert-item green">Loading alerts...</li>
                     </ul>
                 </div>
 
                 <div class="card">
                     <h3>Students</h3>
-                    <p>Manage student access</p>
-                    <button id="btn-generate-qr" class="btn-primary" style="background: #6c757d">Generate QR Code</button>
+                    <p>Manage student access and connections.</p>
+                    <button id="btn-generate-qr" class="btn-primary" style="background: #64748b; margin-top: auto;">Generate QR Code</button>
                 </div>
             </div>
         </main>
     </div>
 
     <!-- QR Code Modal -->
-    <div id="qr-modal" class="modal hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-        <div class="modal-content card" style="background: white; padding: 20px; text-align: center; border-radius: 8px; max-width: 90%;">
-            <h2>Student Join QR Code</h2>
-            <p>Scan this code to join this residence</p>
-            <div id="qr-code-container" style="margin: 20px auto; display: flex; justify-content: center; background: white; padding: 10px;"></div>
-            <p id="qr-link-text" style="word-break: break-all; margin-bottom: 20px; color: #666; font-size: 14px;"></p>
+    <div id="qr-modal" class="modal hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+        <div class="modal-content card" style="background: #ffffff; padding: 30px; text-align: center; border-radius: 16px; max-width: 90%; width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+            <h2 style="margin-top: 0; color: #0f172a;">Student Join QR Code</h2>
+            <p style="color: #64748b;">Scan this code to join this residence</p>
+            <div id="qr-code-container" style="margin: 24px auto; display: flex; justify-content: center; background: white; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; width: fit-content;"></div>
+            <p id="qr-link-text" style="word-break: break-all; margin-bottom: 24px; color: #475569; font-size: 14px; background: #f8fafc; padding: 12px; border-radius: 8px;"></p>
             <button id="btn-close-qr" class="btn-primary">Close</button>
         </div>
     </div>
