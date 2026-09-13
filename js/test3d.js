@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let targetFloorLevel = 0;
+    let isDisplayAllFloors = false;
     const floorHeight = 300; // units
     const wallsGroup = new THREE.Group();
     scene.add(wallsGroup);
@@ -171,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (floorLevels.length === 0) {
                      // Fallback
-                     const localData = localStorage.getItem('dtech_floorplan_v2');
+                     const localData = localStorage.getItem('dtech_floorplan_v2_floor_0') || localStorage.getItem('dtech_floorplan_v2');
                      if (localData) {
                          latestFloorData = JSON.parse(localData);
                          buildFloor(latestFloorData, targetFloorLevel);
@@ -185,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }).catch(e => {
                 // local fallback if network error
-                const localData = localStorage.getItem('dtech_floorplan_v2');
+                const localData = localStorage.getItem('dtech_floorplan_v2_floor_0') || localStorage.getItem('dtech_floorplan_v2');
                 if (localData) {
                     latestFloorData = JSON.parse(localData);
                     buildFloor(latestFloorData, targetFloorLevel);
@@ -203,11 +204,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         } else {
-            // Load from local storage fallback
-            const localData = localStorage.getItem('dtech_floorplan_v2');
-            if (localData) {
-                latestFloorData = JSON.parse(localData);
-                buildFloor(latestFloorData, targetFloorLevel);
+            // Load from local storage fallback (for all floors if possible)
+            let foundAny = false;
+            for (let i = 0; i <= 10; i++) {
+                const localData = localStorage.getItem(`dtech_floorplan_v2_floor_${i}`);
+                if (localData) {
+                    foundAny = true;
+                    buildFloor(JSON.parse(localData), i);
+                }
+            }
+            if (!foundAny) {
+                // try old key
+                const oldData = localStorage.getItem('dtech_floorplan_v2');
+                if (oldData) {
+                    buildFloor(JSON.parse(oldData), 0);
+                }
             }
         }
     }, 500);
@@ -226,6 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const p = camera.position;
             orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
             orbitControls.update();
+            updateFloorVisibility();
         }
     });
 
@@ -236,7 +248,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = camera.position;
         orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
         orbitControls.update();
+        updateFloorVisibility();
     });
+
+    const displayAllFloorsCheck = document.getElementById('check-display-all-floors');
+    if (displayAllFloorsCheck) {
+        displayAllFloorsCheck.addEventListener('change', (e) => {
+            isDisplayAllFloors = e.target.checked;
+            updateFloorVisibility();
+        });
+    }
     document.getElementById('json-upload').addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -308,6 +329,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Floor groups dictionary
     const floorGroups = {};
+
+    function updateFloorVisibility() {
+        Object.keys(floorGroups).forEach(level => {
+            if (isDisplayAllFloors) {
+                floorGroups[level].visible = true;
+            } else {
+                floorGroups[level].visible = (parseInt(level) === targetFloorLevel);
+            }
+        });
+    }
 
     function buildFloor(data, level) {
         if (!data || !data.walls) return;
@@ -509,6 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
             orbitControls.target.set(canvasW / 2, 0, canvasH / 2);
             orbitControls.update();
         }
+
+        updateFloorVisibility();
 
         console.log(`Floor ${level} generated.`);
     }
