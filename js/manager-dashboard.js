@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnLogout = document.getElementById('btn-logout');
 
     btnLogout.addEventListener('click', async () => {
+        if (window.Toast) window.Toast.show('Logging out...', 'info');
         await signOut(auth);
         localStorage.clear();
         window.location.href = 'index.html';
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let qrCode = null;
 
     btnGenerateQr.addEventListener('click', () => {
+        if (window.Toast) window.Toast.show('Generating QR Code...', 'info');
         qrModal.classList.remove('hidden');
         qrCodeContainer.innerHTML = ''; // Clear previous
 

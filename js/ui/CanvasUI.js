@@ -211,16 +211,16 @@ class CanvasUI {
         document.getElementById('btn-save').addEventListener('click', async () => {
             const success = await this.controller.saveLocal();
             if (success) {
-                this.showStatus("Saved to database");
+                this.showStatus("Saved to database", "success");
             } else {
-                this.showStatus("Failed to save. Check connection.");
+                this.showStatus("Failed to save. Check connection.", "error");
             }
         });
 
         document.getElementById('btn-load').addEventListener('click', async () => {
             const success = await this.controller.loadLocal();
             if (success) {
-                this.showStatus("Loaded from database");
+                this.showStatus("Loaded from database", "success");
                 this.render(); // force render
             }
         });
@@ -401,10 +401,15 @@ class CanvasUI {
         this.populateObjectPalette();
     }
 
-    showStatus(msg) {
+    showStatus(msg, type = 'info') {
         const sb = document.getElementById('status-bar');
-        sb.innerText = msg;
-        setTimeout(() => sb.innerText = "Ready", 3000);
+        if (sb) {
+            sb.innerText = msg;
+            setTimeout(() => sb.innerText = "Ready", 3000);
+        }
+        if (window.Toast) {
+            window.Toast.show(msg, type);
+        }
     }
 
     populateObjectPalette() {
@@ -1103,7 +1108,11 @@ class CanvasUI {
                 markBtn.textContent = 'Mark as Faulty';
                 markBtn.onclick = () => {
                     if (faultInput.value.trim() === '') {
-                        alert("Please provide a description.");
+                        if (window.Toast) {
+                            window.Toast.show("Please provide a description.", "warning");
+                        } else {
+                            alert("Please provide a description.");
+                        }
                         return;
                     }
                     const elName = el.name || (el.type === 'object' ? ObjectManager.getObjectDefinition(el.category, el.objType).name : el.type);

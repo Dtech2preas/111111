@@ -145,6 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const newStatus = document.getElementById(`status-${app.id}`).value;
                         const newNote = document.getElementById(`note-${app.id}`).value;
 
+                        if (window.Toast) window.Toast.show('Saving status...', 'info');
                         btn.textContent = 'Saving...';
                         btn.disabled = true;
 
@@ -170,6 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                             }
 
+                            if (window.Toast) window.Toast.show('Status saved successfully', 'success');
                             btn.textContent = 'Saved!';
                             btn.classList.add('saved');
                             setTimeout(() => {
@@ -180,6 +182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                         } catch (err) {
                             console.error("Error saving status", err);
+                            if (window.Toast) window.Toast.show('Error saving status', 'error');
                             btn.textContent = 'Error';
                             setTimeout(() => {
                                 btn.textContent = 'Save';

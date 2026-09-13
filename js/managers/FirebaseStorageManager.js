@@ -9,6 +9,7 @@ export class FirebaseStorageManager {
             return false;
         }
 
+        if (window.Toast) window.Toast.show(`Saving Floor ${floorLevel}...`, 'info');
         try {
             const planRef = doc(db, "residences", residenceId, "floorPlans", `floor_${floorLevel}`);
             await setDoc(planRef, {
@@ -16,9 +17,11 @@ export class FirebaseStorageManager {
                 updatedAt: new Date().toISOString()
             });
             console.log("Floor plan saved to Firebase.");
+            if (window.Toast) window.Toast.show(`Floor ${floorLevel} saved to database`, 'success');
             return true;
         } catch (e) {
             console.error("Failed to save to Firebase:", e);
+            if (window.Toast) window.Toast.show('Failed to save. Check connection.', 'error');
             return false;
         }
     }
@@ -26,14 +29,17 @@ export class FirebaseStorageManager {
     static async loadFromFirebase(residenceId, floorLevel = 0) {
         if (!residenceId) return null;
 
+        if (window.Toast) window.Toast.show(`Loading Floor ${floorLevel}...`, 'info');
         try {
             const planRef = doc(db, "residences", residenceId, "floorPlans", `floor_${floorLevel}`);
             const snapshot = await getDoc(planRef);
             if (snapshot.exists()) {
+                if (window.Toast) window.Toast.show(`Floor ${floorLevel} loaded`, 'success');
                 return snapshot.data().data;
             }
         } catch (e) {
             console.error("Failed to load from Firebase:", e);
+            if (window.Toast) window.Toast.show('Failed to load. Check connection.', 'error');
         }
         return null;
     }
@@ -74,6 +80,7 @@ export class FirebaseStorageManager {
     // --- Issues / Alerts ---
     static async markIssue(residenceId, elementId, elementName, description, severity = 'critical', floorLevel = 0, roomName = 'Unassigned') {
         if (!residenceId) return;
+        if (window.Toast) window.Toast.show(`Marking ${elementName} as faulty...`, 'info');
         try {
             const issueRef = doc(db, "residences", residenceId, "issues", elementId);
             await setDoc(issueRef, {
@@ -85,19 +92,24 @@ export class FirebaseStorageManager {
                 roomName,
                 timestamp: new Date().toISOString()
             });
+            if (window.Toast) window.Toast.show(`${elementName} marked as faulty`, 'warning');
         } catch (e) {
             console.error("Failed to mark issue:", e);
+            if (window.Toast) window.Toast.show('Failed to mark issue', 'error');
         }
     }
 
     static async clearIssue(residenceId, elementId) {
         if (!residenceId) return;
+        if (window.Toast) window.Toast.show(`Clearing issue...`, 'info');
         try {
             const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js");
             const issueRef = doc(db, "residences", residenceId, "issues", elementId);
             await deleteDoc(issueRef);
+            if (window.Toast) window.Toast.show(`Issue cleared`, 'success');
         } catch (e) {
             console.error("Failed to clear issue:", e);
+            if (window.Toast) window.Toast.show('Failed to clear issue', 'error');
         }
     }
 
