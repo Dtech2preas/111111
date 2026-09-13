@@ -21,6 +21,7 @@ class CanvasUI {
         this.lastPinchDist = null;
         this.lastTouchCenter = null;
         this.touchTapTimeout = null;
+        this.isReadOnly = false;
 
         // Drawing state
         this.tempWallStart = null;
@@ -46,13 +47,45 @@ class CanvasUI {
             const sidebarLeft = document.getElementById('sidebar-left');
             if (sidebarLeft) sidebarLeft.style.display = 'none';
 
+            // Make sidebar right float or just keep it but hide everything except floor selector
             const sidebarRight = document.getElementById('sidebar-right');
-            if (sidebarRight) sidebarRight.style.display = 'none';
+            if (sidebarRight) {
+                // Keep it visible, but style it for read-only
+                const children = sidebarRight.children;
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    // Keep the Floors h3 and the floor controls
+                    if (child.tagName === 'H3' && child.textContent === 'Floors') {
+                        continue;
+                    }
+                    if (child.classList.contains('settings-group') && child.querySelector('#btn-floor-down')) {
+                        // Hide the outline checkbox but keep the floor buttons
+                        const outlineContainer = child.querySelector('#use-outline-container');
+                        if (outlineContainer) outlineContainer.style.display = 'none';
+                        continue;
+                    }
+                    // Hide everything else
+                    child.style.display = 'none';
+                }
+
+                // Add some styling to make it look like a floating widget
+                sidebarRight.style.position = 'absolute';
+                sidebarRight.style.top = '10px';
+                sidebarRight.style.right = '10px';
+                sidebarRight.style.width = '200px';
+                sidebarRight.style.height = 'auto';
+                sidebarRight.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                sidebarRight.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                sidebarRight.style.borderRadius = '8px';
+                sidebarRight.style.padding = '15px';
+                sidebarRight.style.zIndex = '1000';
+            }
 
             // Reset tools
             this.controller.setTool('select');
+            this.isReadOnly = true;
 
-            // Re-adjust canvas width since sidebars are gone
+            // Re-adjust canvas width since sidebars are functionally gone from flow
             setTimeout(() => this.resize(), 100);
         }
     }
@@ -102,6 +135,9 @@ class CanvasUI {
         this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
         this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this));
         this.canvas.addEventListener('touchcancel', this.onTouchEnd.bind(this));
+
+        // Global Keydown for Wall Length Override
+        document.addEventListener('keydown', this.onKeyDown.bind(this));
 
         this.controller.on('model_changed', () => this.render());
         this.controller.on('selection_changed', () => this.updatePropertiesPanel());
@@ -436,6 +472,9 @@ class CanvasUI {
         if (this.controller.currentTool === 'select') {
             // Check handles first
             this.activeHandle = this.hitTestHandle(pos);
+            if(this.isReadOnly) {
+                this.activeHandle = null;
+            }
             if(this.activeHandle) {
                 this.isDragging = true;
                 this.controller.selectElement(this.activeHandle.wallId);
@@ -445,7 +484,9 @@ class CanvasUI {
             const hit = this.hitTest(pos);
             this.controller.selectElement(hit ? hit.id : null);
             if (hit) {
-                this.isDragging = true;
+                if (!this.isReadOnly) {
+                    this.isDragging = true;
+                }
                 this.lastMouseX = pos.x;
                 this.lastMouseY = pos.y;
             }
@@ -676,6 +717,87 @@ class CanvasUI {
         }
     }
 
+    onKeyDown(e) {
+        console.log("onKeyDown triggered", e.key, this.controller.currentTool, !!this.tempWallStart);
+        if(this.isReadOnly) return;
+        if(this.controller.currentTool !== 'wall' || !this.tempWallStart) return;
+
+        // Allow enter in the specific length input
+        if(document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.id !== 'input-wall-length') {
+            console.log("Blocked by another input focus");
+            return;
+        }
+
+        const overlay = document.getElementById('wall-length-overlay');
+        const input = document.getElementById('input-wall-length');
+
+        if (!overlay || !input) {
+            console.log("Overlay or input not found");
+            return;
+        }
+
+        if (e.key === 'Enter' && !overlay.classList.contains('hidden')) {
+            // Apply length
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val > 0) {
+                const scale = this.controller.model.data.scale || 100;
+                const distPixels = val * scale;
+
+                // Calculate direction from start to current mouse
+                if (this.currentMousePos) {
+                    const dx = this.currentMousePos.x - this.tempWallStart.x;
+                    const dy = this.currentMousePos.y - this.tempWallStart.y;
+                    const currentDist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (currentDist > 0) {
+                        const finalPos = {
+                            x: this.tempWallStart.x + (dx / currentDist) * distPixels,
+                            y: this.tempWallStart.y + (dy / currentDist) * distPixels
+                        };
+                        this.controller.addWall(this.tempWallStart, finalPos);
+                        this.tempWallStart = finalPos;
+                        this.render();
+                    }
+                }
+            }
+            overlay.classList.add('hidden');
+            input.value = '';
+            input.blur();
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            overlay.classList.add('hidden');
+            input.value = '';
+            input.blur();
+            this.tempWallStart = null;
+            this.render();
+            return;
+        }
+
+        // If it's a number or decimal point
+        if (/^[0-9.]$/.test(e.key)) {
+            console.log("Number typed", e.key);
+            if (overlay.classList.contains('hidden')) {
+                console.log("Showing overlay");
+                overlay.classList.remove('hidden');
+                // Position near mouse
+                if (this.currentMousePos) {
+                    // We need to translate the model position (this.currentMousePos)
+                    // back to screen coordinates relative to the canvas
+                    const screenX = (this.currentMousePos.x * this.zoom) + this.panX;
+                    const screenY = (this.currentMousePos.y * this.zoom) + this.panY;
+
+                    overlay.style.left = (screenX + 20) + 'px';
+                    overlay.style.top = (screenY + 20) + 'px';
+                    console.log("Overlay positioned at", overlay.style.left, overlay.style.top);
+                }
+                input.value = ''; // clear it before native event appends
+                input.focus();
+            }
+        }
+    }
+
     onWheel(e) {
         e.preventDefault();
         const mousePos = this.getMousePos(e);
@@ -890,8 +1012,22 @@ class CanvasUI {
             this.createInputRow(panel, 'Type', el.type, null, true); // readonly
             this.createInputRow(panel, 'Area (m²)', el.area.toFixed(2), null, true);
         } else if (el.type === 'wall') {
-            const length = (GeometryEngine.distance(el.start, el.end) * this.controller.model.data.scale).toFixed(2);
-            this.createInputRow(panel, 'Length (m)', length, null, true);
+            const scale = this.controller.model.data.scale || 100;
+            const length = (GeometryEngine.distance(el.start, el.end) / scale).toFixed(2);
+            this.createInputRow(panel, 'Length (m)', length, (val) => {
+                const newLen = parseFloat(val);
+                if(isNaN(newLen) || newLen <= 0) return;
+                const dist = GeometryEngine.distance(el.start, el.end);
+                if(dist === 0) return;
+                const ratio = (newLen * scale) / dist;
+                const newEnd = {
+                    x: el.start.x + (el.end.x - el.start.x) * ratio,
+                    y: el.start.y + (el.end.y - el.start.y) * ratio
+                };
+                this.controller.updateWallEnd(el.id, { start: el.start, end: newEnd });
+                this.controller.commitAction();
+                this.render();
+            }, false, 'number');
             this.createInputRow(panel, 'Thickness', el.thickness, (val) => this.updateProp(el.id, {thickness: parseFloat(val)}), false, 'number');
         } else if (el.type === 'door') {
             this.createInputRow(panel, 'Width', el.width, (val) => this.updateProp(el.id, {width: parseFloat(val)}), false, 'number');
