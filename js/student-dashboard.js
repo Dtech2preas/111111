@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnLogout = document.getElementById('btn-logout');
 
     btnLogout.addEventListener('click', async () => {
+        if (window.Toast) window.Toast.show('Logging out...', 'info');
         if (!isGuest) {
             try {
                 await signOut(auth);

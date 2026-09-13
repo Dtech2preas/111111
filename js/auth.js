@@ -90,10 +90,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (isLoginMode) {
                 // Log In
+                if (window.Toast) window.Toast.show('Logging in...', 'info');
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                if (window.Toast) window.Toast.show('Login successful', 'success');
                 await handleUserRouting(userCredential.user);
             } else {
                 // Sign Up
+                if (window.Toast) window.Toast.show('Signing up...', 'info');
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
                 // Save user profile to Firestore
@@ -116,11 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                if (window.Toast) window.Toast.show('Signup successful', 'success');
                 await handleUserRouting(userCredential.user);
             }
         } catch (error) {
             console.error("Auth Error:", error);
             authError.textContent = error.message;
+            if (window.Toast) window.Toast.show(error.message, 'error');
         } finally {
             btnAuthSubmit.disabled = false;
         }
