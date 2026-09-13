@@ -178,11 +178,21 @@ document.addEventListener('DOMContentLoaded', () => {
                      }
                 }
 
-                // Now setup listeners for changes (simple approach: just listen to current target floor for updates)
-                window.FirebaseStorageManager.listenToFloorPlan(residenceId, targetFloorLevel, (data) => {
-                    latestFloorData = data;
-                    buildFloor(data, targetFloorLevel);
-                });
+                // We should listen to all floors if possible, or re-subscribe when targetFloorLevel changes.
+                // For a multi-floor 3D view, it's actually better to listen to the specific floor or just rebuild everything from scratch.
+                // Let's implement a dynamic listener.
+                let unsubscribeFloor = null;
+                const setupFloorListener = (level) => {
+                    if (unsubscribeFloor) unsubscribeFloor();
+                    unsubscribeFloor = window.FirebaseStorageManager.listenToFloorPlan(residenceId, level, (data) => {
+                        latestFloorData = data;
+                        buildFloor(data, level);
+                    });
+                };
+                setupFloorListener(targetFloorLevel);
+
+                // Expose a way to update listener when floor changes
+                window.updateFloorListener = setupFloorListener;
             }).catch(e => {
                 // local fallback if network error
                 const localData = localStorage.getItem('dtech_floorplan_v2');
@@ -226,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const p = camera.position;
             orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
             orbitControls.update();
+            if (window.updateFloorListener) window.updateFloorListener(targetFloorLevel);
         }
     });
 
@@ -236,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const p = camera.position;
         orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
         orbitControls.update();
+        if (window.updateFloorListener) window.updateFloorListener(targetFloorLevel);
     });
     document.getElementById('json-upload').addEventListener('change', (event) => {
         const file = event.target.files[0];
