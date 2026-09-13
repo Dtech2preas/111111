@@ -17,11 +17,11 @@
         </header>
 
         <main>
-            <h2 id="residence-name">🏠 Residence Loading...</h2>
+            <h2 id="residence-name" style="margin-bottom: 24px; color: #0f172a;">🏠 Residence Loading...</h2>
 
-            <div class="card" style="margin-bottom: 20px;">
+            <div class="card" style="margin-bottom: 24px;">
                 <h3>Current Alerts</h3>
-                <ul class="alert-list" id="student-alerts">
+                <ul class="alert-list" id="student-alerts" style="max-height: 200px; overflow-y: auto;">
                     <li class="alert-item green">Loading alerts...</li>
                 </ul>
             </div>
@@ -29,12 +29,14 @@
             <div class="dashboard-grid">
                 <div class="card">
                     <h3>2D Plan</h3>
-                    <button id="btn-view-2d" class="btn-primary" onclick="window.location.href='edit.html?readonly=true'">View 2D Plan</button>
+                    <p>View the floor layout and appliance statuses.</p>
+                    <button id="btn-view-2d" class="btn-primary" onclick="window.location.href='edit.html?readonly=true'" style="margin-top: auto;">View 2D Plan</button>
                 </div>
 
                 <div class="card">
                     <h3>3D Residence</h3>
-                    <button id="btn-view-3d" class="btn-primary" onclick="window.location.href='student-3d.html?readonly=true'">View 3D Residence</button>
+                    <p>Explore an interactive 3D model of your residence.</p>
+                    <button id="btn-view-3d" class="btn-primary" onclick="window.location.href='student-3d.html?readonly=true'" style="margin-top: auto; background-color: #8b5cf6;">View 3D Residence</button>
                 </div>
             </div>
         </main>

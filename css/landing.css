@@ -2,8 +2,8 @@
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #f4f7fb;
-    color: #333;
+    background: #f8fafc;
+    color: #334155;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -11,19 +11,22 @@ body {
 
 /* Layout Containers */
 .landing-container {
-    max-width: 500px;
-    margin: auto; /* Centers the container when body is flex/grid or has min-height */
-    padding: 20px;
+    max-width: 600px; /* Increased width for better desktop experience */
+    margin: auto;
+    padding: 30px;
     width: 100%;
     box-sizing: border-box;
 }
 
 .dashboard-container {
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 30px 20px;
     width: 100%;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 /* Headers */
@@ -32,12 +35,14 @@ body {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 .landing-header h1 {
-    font-size: 24px;
+    font-size: 28px;
+    font-weight: 700;
     margin: 0;
-    color: #2c3e50;
+    color: #0f172a;
+    letter-spacing: -0.5px;
 }
 
 .dashboard-header {
@@ -51,59 +56,64 @@ body {
 
 /* Main Content Area in Landing */
 .landing-main {
-    background: white;
-    padding: 30px 25px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
     text-align: center;
+    border: 1px solid #f1f5f9;
 }
 
 .landing-main h2 {
     margin-top: 0;
-    font-size: 22px;
-    color: #2c3e50;
+    font-size: 24px;
+    font-weight: 600;
+    color: #0f172a;
 }
 
 .landing-main p {
-    color: #666;
-    margin-bottom: 25px;
+    color: #64748b;
+    margin-bottom: 30px;
+    font-size: 16px;
 }
 
 /* Role Selection */
 .role-selection {
     display: flex;
-    gap: 15px;
+    gap: 20px;
     justify-content: center;
 }
 
 .role-btn {
     flex: 1;
-    padding: 20px 15px;
-    border: 2px solid #eaedf1;
-    border-radius: 10px;
-    background: #fafbfc;
+    padding: 24px 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: #ffffff;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: center;
 }
 
 .role-btn:hover {
-    border-color: #007bff;
-    background: #f0f8ff;
+    border-color: #3b82f6;
+    background: #f8fafc;
     transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0,123,255,0.1);
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -4px rgba(59, 130, 246, 0.05);
 }
 
 .role-btn h3 {
     margin: 0 0 8px 0;
-    font-size: 16px;
-    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
 }
 
 .role-btn p {
     margin: 0;
-    font-size: 13px;
-    color: #6c757d;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.4;
 }
 
 /* Utility */
@@ -112,19 +122,22 @@ body {
 /* Authentication Section */
 .auth-section {
     text-align: left;
+    max-width: 400px;
+    margin: 0 auto;
 }
 
 #auth-title {
-    margin-top: 15px;
-    margin-bottom: 20px;
-    font-size: 20px;
-    color: #2c3e50;
+    margin-top: 20px;
+    margin-bottom: 25px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #0f172a;
     text-align: center;
 }
 
 /* Forms */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .form-group label {
@@ -132,59 +145,72 @@ body {
     margin-bottom: 8px;
     font-size: 14px;
     font-weight: 600;
-    color: #4a5568;
+    color: #334155;
 }
 
 .form-group input {
     width: 100%;
-    padding: 12px 15px;
+    padding: 14px 16px;
     font-size: 16px; /* 16px prevents iOS zoom on focus */
-    border: 1px solid #cbd5e0;
-    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
     box-sizing: border-box;
-    transition: border-color 0.2s;
+    transition: all 0.2s ease;
+    background-color: #f8fafc;
+    color: #1e293b;
 }
 
 .form-group input:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
 }
 
 /* Buttons */
 .btn-primary {
-    background: #007bff;
-    color: white;
+    background: #2563eb;
+    color: #ffffff;
     border: none;
-    padding: 14px 20px;
-    border-radius: 8px;
+    padding: 14px 24px;
+    border-radius: 10px;
     cursor: pointer;
     width: 100%;
     font-size: 16px;
     font-weight: 600;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
     margin-top: 10px;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -2px rgba(37, 99, 235, 0.1);
 }
 
 .btn-primary:hover {
-    background: #0056b3;
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.1);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px -1px rgba(37, 99, 235, 0.1);
 }
 
 .btn-text {
     background: none;
     border: none;
-    color: #6c757d;
+    color: #64748b;
     cursor: pointer;
-    padding: 5px 0;
+    padding: 8px 12px;
+    border-radius: 6px;
     font-size: 14px;
     font-weight: 500;
-    transition: color 0.2s;
+    transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
 }
 
 .btn-text:hover {
-    color: #343a40;
+    color: #1e293b;
+    background: #f1f5f9;
 }
 
 .auth-section p {
@@ -220,24 +246,40 @@ body {
 /* Dashboards */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
 }
 
 .card {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    border: 1px solid #f0f0f0;
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.025);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
 }
 
 .card h3 {
     margin-top: 0;
-    color: #2c3e50;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 600;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 12px;
     margin-bottom: 20px;
+}
+
+.card p {
+    color: #64748b;
+    margin-bottom: 20px;
+    line-height: 1.5;
+    flex-grow: 1;
+}
+
+.card .btn-primary {
+    margin-top: 10px;
+    width: auto;
 }
 
 .alert-list {
@@ -260,16 +302,30 @@ body {
 .alert-item.green { border-color: #38a169; background-color: #f0fff4;}
 
 /* Responsive Design */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+    .landing-container {
+        padding: 20px;
+    }
+
+    .landing-main {
+        padding: 30px 20px;
+    }
+
     .role-selection {
         flex-direction: column;
+        gap: 15px;
+    }
+
+    .dashboard-container {
+        padding: 20px 15px;
     }
 
     .dashboard-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
 
-    .landing-main {
-        padding: 25px 20px;
+    .card {
+        padding: 20px;
     }
 }
