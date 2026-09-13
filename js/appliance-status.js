@@ -35,7 +35,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             return inside;
         };
 
-        for (const [floorLevel, data] of Object.entries(floorsData)) {
+
+        const safeParse = (data) => {
+            let parsed = data;
+            while (typeof parsed === 'string') {
+                try {
+                    parsed = JSON.parse(parsed);
+                } catch(e) {
+                    return null;
+                }
+            }
+            return parsed;
+        };
+
+        for (const [floorLevel, rawData] of Object.entries(floorsData)) {
+            const data = safeParse(rawData);
             if (data && data.objects) {
                 const apps = data.objects.filter(obj => applianceTypes.includes(obj.type));
                 const rooms = data.rooms || [];
