@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Check if accessing via guest view (QR Code) or from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewResidenceId = urlParams.get('view_residence');
+    if (viewResidenceId) {
+        localStorage.setItem('dtech_residence_id', viewResidenceId);
+        localStorage.setItem('dtech_user_role', 'student');
+        localStorage.setItem('dtech_guest_mode', 'true');
+    }
     // Basic Three.js setup
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
@@ -186,18 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (floorLevels.length === 0) {
-                     // Fallback
-                     for(let i=0; i<=10; i++) {
-                          const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                          if (localData) {
-                              buildFloor(JSON.parse(localData), i);
-                              if (i === targetFloorLevel) {
-                                  latestFloorData = JSON.parse(localData);
-                              } else {
-                                  if (floorGroups[i]) floorGroups[i].visible = false;
-                              }
-                          }
-                     }
+                     console.log('No floors found in Firebase for this residence.');
                 }
 
                 // Now setup listeners for changes (simple approach: just listen to current target floor for updates)
@@ -206,19 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     buildFloor(data, targetFloorLevel);
                 });
             }).catch(e => {
-                // local fallback if network error
-                for(let i=0; i<=10; i++) {
-                     const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                     if (localData) {
-                         buildFloor(JSON.parse(localData), i);
-                         if (i === targetFloorLevel) {
-                             latestFloorData = JSON.parse(localData);
-                             if (floorGroups[i]) floorGroups[i].visible = true;
-                         } else {
-                             if (floorGroups[i]) floorGroups[i].visible = false;
-                         }
-                     }
-                }
+                console.error('Firebase error loading floors:', e);
             });
 
             // Listen to issue changes
@@ -232,18 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         } else {
-            // Load from local storage fallback
-            for(let i=0; i<=10; i++) {
-                 const localData = localStorage.getItem('dtech_floorplan_v2_floor_' + i);
-                 if (localData) {
-                     buildFloor(JSON.parse(localData), i);
-                     if (i === targetFloorLevel) {
-                         latestFloorData = JSON.parse(localData);
-                     } else {
-                         if (floorGroups[i]) floorGroups[i].visible = false;
-                     }
-                 }
-            }
+            console.error('Missing residenceId or FirebaseStorageManager is not loaded.');
         }
     };
     waitForFirebase();
@@ -402,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Walk Mode
     // Readonly Mode (hide inputs for students)
-    const urlParams = new URLSearchParams(window.location.search);
+    // urlParams already defined at top
     const isGuest = localStorage.getItem('dtech_guest_mode') === 'true';
     const isStudent = localStorage.getItem('dtech_user_role') === 'student';
     if (urlParams.get('readonly') === 'true' || isGuest || isStudent) {
