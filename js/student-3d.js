@@ -98,6 +98,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let wallsMaterials = [];
     let isTransparent = false;
 
+
+    // Animation state variables for camera tweening and floor fading
+    let cameraTargetPos = null;
+    let controlsTargetPos = null;
+    let cameraTweenSpeed = 0.05;
+    let isAutoWalking = false;
+    let walkPoints = [];
+    let walkProgress = 0;
+    const walkSpeed = 0.001; // Curve progress per frame
+    let walkCurve = null;
+
+    function lerp(start, end, t) {
+        return start * (1 - t) + end * t;
+    }
+
     // Movement state
     const moveState = { forward: false, backward: false, left: false, right: false };
     const velocity = new THREE.Vector3();
@@ -162,6 +177,73 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(animate);
 
         const time = performance.now();
+
+
+        // Camera Tweening
+        if (cameraTargetPos && !isWalkMode && !isAutoWalking) {
+            camera.position.lerp(cameraTargetPos, cameraTweenSpeed);
+            if (controlsTargetPos) {
+                orbitControls.target.lerp(controlsTargetPos, cameraTweenSpeed);
+            }
+            if (camera.position.distanceTo(cameraTargetPos) < 1) {
+                cameraTargetPos = null;
+                controlsTargetPos = null;
+            }
+        }
+
+        // Auto Walkthrough
+        if (isAutoWalking && walkCurve) {
+            walkProgress += walkSpeed;
+            if (walkProgress > 1) walkProgress = 0; // loop
+
+            const pt = walkCurve.getPointAt(walkProgress);
+            const ptLook = walkCurve.getPointAt((walkProgress + 0.01) % 1);
+
+            camera.position.set(pt.x, pt.y, pt.z);
+            camera.lookAt(ptLook);
+        }
+
+        // Floor Fading (smooth transitions)
+        Object.keys(floorGroups).forEach(level => {
+            const group = floorGroups[level];
+            const targetVisible = isDisplayingAllFloors || parseInt(level) === targetFloorLevel;
+
+            // Adjust materials opacity smoothly
+            let currentOpacity = group.userData.currentOpacity !== undefined ? group.userData.currentOpacity : (group.visible ? 1 : 0);
+            const targetOpacity = targetVisible ? 1 : 0;
+            const fadeSpeed = 0.05; // Make fade slower by adjusting this
+
+            if (currentOpacity !== targetOpacity) {
+                group.visible = true;
+                currentOpacity = lerp(currentOpacity, targetOpacity, fadeSpeed);
+                if (Math.abs(currentOpacity - targetOpacity) < 0.01) {
+                    currentOpacity = targetOpacity;
+                    if (currentOpacity === 0) group.visible = false;
+                }
+
+                group.userData.currentOpacity = currentOpacity;
+
+                // apply to meshes
+                group.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        child.material.transparent = true;
+
+                        // Handle toggle transparency mode
+                        let finalOpacity = currentOpacity;
+                        if (isTransparent && child.material.userData.isWall) {
+                            finalOpacity = Math.min(currentOpacity, 0.3);
+                        }
+
+                        if (child.material.transmission !== undefined) {
+                             // Windows
+                             child.material.opacity = finalOpacity * 0.5;
+                        } else {
+                             child.material.opacity = finalOpacity;
+                        }
+                    }
+                });
+            }
+        });
 
         if (isWalkMode && pointerLockControls.isLocked) {
             const delta = (time - prevTime) / 1000;
@@ -350,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
              // Hide all except current
              Object.keys(floorGroups).forEach(level => {
                   if (parseInt(level) !== targetFloorLevel) {
-                       floorGroups[level].visible = false;
+                       // floorGroups[level].visible = false; handled by opacity
                   } else {
                        floorGroups[level].visible = true;
                   }
@@ -363,10 +445,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetFloorLevel > 0) {
             targetFloorLevel--;
             targetFloorDisplay.innerText = targetFloorLevel;
-            // Move camera
+            // Smoothly Move camera
             const p = camera.position;
-            orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
-            orbitControls.update();
+            cameraTargetPos = new THREE.Vector3(p.x, targetFloorLevel * floorHeight + (p.y - (targetFloorLevel+1)*floorHeight), p.z);
+            controlsTargetPos = new THREE.Vector3(orbitControls.target.x, targetFloorLevel * floorHeight, orbitControls.target.z);
 
             // Ensure floor is built ONLY IF it's not already built
             if (!floorGroups[targetFloorLevel]) {
@@ -394,10 +476,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-increase-floor').addEventListener('click', () => {
         targetFloorLevel++;
         targetFloorDisplay.innerText = targetFloorLevel;
-        // Move camera
-        const p = camera.position;
-        orbitControls.target.set(p.x, targetFloorLevel * floorHeight, p.z);
-        orbitControls.update();
+        // Smoothly Move camera
+            const p = camera.position;
+            cameraTargetPos = new THREE.Vector3(p.x, targetFloorLevel * floorHeight + (p.y - (targetFloorLevel-1)*floorHeight), p.z);
+            controlsTargetPos = new THREE.Vector3(orbitControls.target.x, targetFloorLevel * floorHeight, orbitControls.target.z);
 
         // Ensure floor is built ONLY IF it's not already built
         if (!floorGroups[targetFloorLevel]) {
@@ -438,6 +520,80 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
         event.target.value = '';
     });
+
+
+    // Camera Presets
+    document.getElementById('btn-cam-top').addEventListener('click', () => {
+        isAutoWalking = false;
+        cameraTargetPos = new THREE.Vector3(0, targetFloorLevel * floorHeight + 1500, 0);
+        controlsTargetPos = new THREE.Vector3(0, targetFloorLevel * floorHeight, 0);
+    });
+
+    document.getElementById('btn-cam-iso').addEventListener('click', () => {
+        isAutoWalking = false;
+        cameraTargetPos = new THREE.Vector3(1000, targetFloorLevel * floorHeight + 1000, 1000);
+        controlsTargetPos = new THREE.Vector3(0, targetFloorLevel * floorHeight, 0);
+    });
+
+    document.getElementById('btn-cam-side').addEventListener('click', () => {
+        isAutoWalking = false;
+        cameraTargetPos = new THREE.Vector3(1500, targetFloorLevel * floorHeight + 300, 0);
+        controlsTargetPos = new THREE.Vector3(0, targetFloorLevel * floorHeight, 0);
+    });
+
+    // Auto Walkthrough
+    document.getElementById('btn-walkthrough').addEventListener('click', () => {
+        isAutoWalking = !isAutoWalking;
+        if (isAutoWalking) {
+            orbitControls.enabled = false;
+            if (pointerLockControls.isLocked) pointerLockControls.unlock();
+
+            // Build a curve from rooms / points
+            const yOffset = targetFloorLevel * floorHeight + 150; // human height
+            let points = [];
+
+                        if (latestFloorData && latestFloorData.doors) {
+                // Collect points around doors to simulate walking through passages/hallways
+                latestFloorData.doors.forEach(door => {
+                    const dx = door.position.x;
+                    const dz = door.position.y;
+
+                    // We'll add a point slightly offset from the door to represent the passage
+                    // A proper pathfinding would need NavMesh, but this creates a reasonable tour
+                    points.push(new THREE.Vector3(dx + 100, yOffset, dz + 100));
+                    points.push(new THREE.Vector3(dx - 100, yOffset, dz - 100));
+                });
+
+                // If there are no doors, we can try to find open space (0,0)
+                if (points.length === 0) {
+                    points.push(new THREE.Vector3(0, yOffset, 0));
+                }
+            }
+
+            if (points.length < 2) {
+                // Default path if no rooms
+                points = [
+                    new THREE.Vector3(-500, yOffset, -500),
+                    new THREE.Vector3(500, yOffset, -500),
+                    new THREE.Vector3(500, yOffset, 500),
+                    new THREE.Vector3(-500, yOffset, 500)
+                ];
+            }
+
+            // Sort points loosely by distance to create a tour
+            // A simple greedy TSP could work, but just leaving them as is or sorting by X is fine
+            walkCurve = new THREE.CatmullRomCurve3(points, true); // closed loop
+            walkProgress = 0;
+
+        } else {
+            orbitControls.enabled = true;
+            // Return to iso
+            cameraTargetPos = new THREE.Vector3(camera.position.x, camera.position.y + 500, camera.position.z + 500);
+            controlsTargetPos = new THREE.Vector3(camera.position.x, targetFloorLevel * floorHeight, camera.position.z);
+        }
+        document.getElementById('btn-walkthrough').innerText = isAutoWalking ? "Stop Walkthrough" : "Auto Walkthrough (Passages)";
+    });
+
 
     // Toggle Transparency
     document.getElementById('btn-toggle-transparent').addEventListener('click', () => {
@@ -557,45 +713,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const wallMaterial = new THREE.MeshLambertMaterial({ color: 0xe0e0e0 });
+        wallMaterial.userData = { isWall: true };
         if (isTransparent) {
             wallMaterial.transparent = true;
             wallMaterial.opacity = 0.3;
         }
         wallsMaterials.push(wallMaterial);
 
+
         const wallHeight = floorHeight - 10;
 
-        data.walls.forEach(wall => {
-            const startX = wall.start.x;
-            const startZ = wall.start.y;
-            const endX = wall.end.x;
-            const endZ = wall.end.y;
+        // Helper to check intersection and return segments
+        function cutWall(wall, cutouts) {
+            const sx = wall.start.x, sy = wall.start.y;
+            const ex = wall.end.x, ey = wall.end.y;
 
-            const dx = endX - startX;
-            const dz = endZ - startZ;
-            const length = Math.sqrt(dx * dx + dz * dz);
+            const wallLength = Math.hypot(ex-sx, ey-sy);
+            const dirX = (ex-sx)/wallLength;
+            const dirY = (ey-sy)/wallLength;
+
+            let segments = [{start: 0, end: wallLength}];
+            let topSegments = [];
+            let bottomSegments = [];
+
+            cutouts.forEach(cut => {
+                const cx = cut.position.x;
+                const cy = cut.position.y;
+
+                const dot = (cx - sx)*dirX + (cy - sy)*dirY;
+                const w = cut.width || (cut.type==='door' ? 80 : 100);
+
+                const distToLine = Math.abs((ex-sx)*(sy-cy) - (sx-cx)*(ey-sy)) / wallLength;
+                let thickness = wall.thickness;
+                if (!thickness || thickness < 1) thickness = (wall.thickness || 0.15) * scale;
+
+                if (distToLine < thickness + w/2) {
+                    const cutStart = dot - w/2;
+                    const cutEnd = dot + w/2;
+
+                    let newSegs = [];
+                    segments.forEach(seg => {
+                        if (cutEnd <= seg.start || cutStart >= seg.end) {
+                            newSegs.push(seg);
+                        } else {
+                            if (cutStart > seg.start) newSegs.push({start: seg.start, end: cutStart});
+                            if (cutEnd < seg.end) newSegs.push({start: cutEnd, end: seg.end});
+
+                            if (cut.type === 'door') {
+                                topSegments.push({start: Math.max(seg.start, cutStart), end: Math.min(seg.end, cutEnd), type: 'door'});
+                            } else {
+                                topSegments.push({start: Math.max(seg.start, cutStart), end: Math.min(seg.end, cutEnd), type: 'window'});
+                                bottomSegments.push({start: Math.max(seg.start, cutStart), end: Math.min(seg.end, cutEnd), type: 'window'});
+                            }
+                        }
+                    });
+                    segments = newSegs;
+                }
+            });
+            return { full: segments, top: topSegments, bottom: bottomSegments };
+        }
+
+        let allCutouts = [];
+        if (data.doors) allCutouts.push(...data.doors.map(d => ({...d, type: 'door'})));
+        if (data.windows) allCutouts.push(...data.windows.map(w => ({...w, type: 'window'})));
+
+        data.walls.forEach(wall => {
+            const sx = wall.start.x, sy = wall.start.y;
+            const ex = wall.end.x, ey = wall.end.y;
+            const wallLength = Math.hypot(ex-sx, ey-sy);
 
             let thickness = wall.thickness;
-            if (!thickness || thickness < 1) {
-                thickness = (wall.thickness || 0.15) * scale;
-            }
+            if (!thickness || thickness < 1) thickness = (wall.thickness || 0.15) * scale;
 
-            const wallGeom = new THREE.BoxGeometry(length, wallHeight, thickness);
-            const wallMesh = new THREE.Mesh(wallGeom, wallMaterial);
+            const dx = ex - sx;
+            const dy = ey - sy;
+            const angle = -Math.atan2(dy, dx);
 
-            const midX = (startX + endX) / 2;
-            const midZ = (startZ + endZ) / 2;
+            const cuts = cutWall(wall, allCutouts);
 
-            wallMesh.position.set(midX, yOffset + wallHeight / 2, midZ);
+            const buildSeg = (seg, h, yOff) => {
+                const len = seg.end - seg.start;
+                if (len <= 0) return;
+                const segMid = seg.start + len/2;
+                const midX = sx + (dx/wallLength)*segMid;
+                const midY = sy + (dy/wallLength)*segMid;
 
-            const angle = -Math.atan2(dz, dx);
-            wallMesh.rotation.y = angle;
+                const geom = new THREE.BoxGeometry(len, h, thickness);
+                const mesh = new THREE.Mesh(geom, wallMaterial);
+                mesh.position.set(midX, yOffset + yOff + h/2, midY);
+                mesh.rotation.y = angle;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                currentFloorGroup.add(mesh);
+            };
 
-            wallMesh.castShadow = true;
-            wallMesh.receiveShadow = true;
-
-            currentFloorGroup.add(wallMesh);
+            cuts.full.forEach(seg => buildSeg(seg, wallHeight, 0));
+            cuts.top.forEach(seg => {
+                if (seg.type === 'door') {
+                     buildSeg(seg, wallHeight - 200, 200);
+                } else {
+                     buildSeg(seg, wallHeight - 200, 200);
+                }
+            });
+            cuts.bottom.forEach(seg => {
+                if (seg.type === 'window') {
+                     buildSeg(seg, 80, 0);
+                }
+            });
         });
+
 
         // Add Doors
         if (data.doors) {
@@ -637,7 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const winMesh = new THREE.Mesh(winGeom, winMat);
 
                 // Position typically off ground
-                winMesh.position.set(win.position.x, yOffset + 100 + h / 2, win.position.y);
+                winMesh.position.set(win.position.x, yOffset + 80 + h / 2, win.position.y);
 
                 const angle = win.rotation ? win.rotation : 0;
                 winMesh.rotation.y = -angle;
@@ -673,18 +899,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const objMat = new THREE.MeshLambertMaterial({ color: color });
+                                const objGroup = new THREE.Group();
                 const objGeom = new THREE.BoxGeometry(w, h, d);
                 const objMesh = new THREE.Mesh(objGeom, objMat);
 
-                objMesh.position.set(obj.position.x, yOffset + h / 2, obj.position.y);
+                // Enhance specific models
+                if (obj.type.includes('bed')) {
+                    // Add a pillow
+                    const pillowMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+                    const pillowGeom = new THREE.BoxGeometry(w * 0.8, 10, d * 0.2);
+                    const pillowMesh = new THREE.Mesh(pillowGeom, pillowMat);
+                    pillowMesh.position.set(0, h/2 + 5, -d/2 + (d * 0.2)/2 + 5);
+                    objGroup.add(pillowMesh);
+                } else if (obj.type.includes('table') || obj.type.includes('desk')) {
+                    // Make it look like a table (top and legs)
+                    objMesh.scale.set(1, 0.1, 1);
+                    objMesh.position.set(0, h/2 - (h*0.1)/2, 0);
 
-                if (obj.rotation) {
-                    objMesh.rotation.y = -obj.rotation;
+                                        const legGeom = new THREE.BoxGeometry(5, h, 5);
+                    const positions = [
+                        [w/2-5, 0, d/2-5], [-w/2+5, 0, d/2-5],
+                        [w/2-5, 0, -d/2+5], [-w/2+5, 0, -d/2+5]
+                    ];
+                    positions.forEach(pos => {
+                        const leg = new THREE.Mesh(legGeom, objMat);
+                        leg.position.set(pos[0], pos[1], pos[2]);
+                        objGroup.add(leg);
+                    });
                 }
 
                 objMesh.castShadow = true;
                 objMesh.receiveShadow = true;
-                currentFloorGroup.add(objMesh);
+                objGroup.add(objMesh);
+                objGroup.position.set(obj.position.x, yOffset + h / 2, obj.position.y);
+
+                if (obj.rotation) {
+                    objGroup.rotation.y = -obj.rotation;
+                }
+
+                currentFloorGroup.add(objGroup);
             });
         }
 
