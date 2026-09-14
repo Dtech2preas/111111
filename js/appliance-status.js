@@ -84,119 +84,176 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentIssues[doc.id] = doc.data();
         });
 
+
         // 3. Group by Floor and Room
-        const groupedAppliances = {};
+        const floorGroups = {};
         allAppliances.forEach(app => {
-            const groupKey = `Floor ${app.floorLevel} - ${app.roomName}`;
-            if (!groupedAppliances[groupKey]) {
-                groupedAppliances[groupKey] = [];
+            if (!floorGroups[app.floorLevel]) {
+                floorGroups[app.floorLevel] = { issuesCount: 0, rooms: {} };
             }
-            groupedAppliances[groupKey].push(app);
+            if (!floorGroups[app.floorLevel].rooms[app.roomName]) {
+                floorGroups[app.floorLevel].rooms[app.roomName] = [];
+            }
+            floorGroups[app.floorLevel].rooms[app.roomName].push(app);
+
+            if (currentIssues[app.id]) {
+                floorGroups[app.floorLevel].issuesCount++;
+            }
         });
 
         // 4. Render UI
-
         loading.style.display = 'none';
 
-        for (const [roomName, apps] of Object.entries(groupedAppliances)) {
-            const roomGroup = document.createElement('div');
-            roomGroup.className = 'room-group';
+        const collapseAllBtn = document.createElement('button');
+        collapseAllBtn.textContent = 'Collapse All';
+        collapseAllBtn.className = 'btn-text';
+        collapseAllBtn.style.marginBottom = '20px';
+        collapseAllBtn.onclick = () => {
+            document.querySelectorAll('details').forEach(d => d.removeAttribute('open'));
+        };
+        container.appendChild(collapseAllBtn);
 
-            const title = document.createElement('h2');
-            title.className = 'room-title';
-            title.textContent = roomName;
-            roomGroup.appendChild(title);
+        // Sort floors numerically
+        const sortedFloors = Object.keys(floorGroups).sort((a, b) => parseInt(a) - parseInt(b));
 
-            const list = document.createElement('ul');
-            list.className = 'appliance-list';
+        for (const floorLevel of sortedFloors) {
+            const floorData = floorGroups[floorLevel];
 
-            apps.forEach(app => {
-                const li = document.createElement('li');
-                li.className = 'appliance-item';
+            const floorDetails = document.createElement('details');
+            floorDetails.className = 'floor-details';
+            floorDetails.style.marginBottom = '20px';
+            floorDetails.style.border = '1px solid #ccc';
+            floorDetails.style.borderRadius = '8px';
+            floorDetails.style.padding = '10px';
+            floorDetails.style.background = '#f9fafb';
 
-                const issue = currentIssues[app.id];
-                const status = issue ? issue.status || 'not_working' : 'working';
-                const note = issue ? issue.description : '';
+            const summary = document.createElement('summary');
+            summary.style.cursor = 'pointer';
+            summary.style.fontWeight = 'bold';
+            summary.style.fontSize = '18px';
+            summary.style.padding = '10px 0';
 
-                const niceName = app.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            const issueText = floorData.issuesCount > 0 ? `<span style="color:red;">(${floorData.issuesCount} issues)</span>` : '<span style="color:green;">(All good)</span>';
+            const floorName = floorLevel === '0' ? 'Ground Floor' : `Floor ${floorLevel}`;
+            summary.innerHTML = `${floorName} ${issueText}`;
 
-                li.innerHTML = `
-                    <div class="appliance-header">
-                        <span class="appliance-title">${niceName}</span>
-                        <span class="appliance-room">ID: ${app.id.split('_').pop()}</span>
-                    </div>
-                    <div class="appliance-controls">
-                        <select class="status-select" id="status-${app.id}">
-                            <option value="working" ${status === 'working' ? 'selected' : ''}>🟢 Working</option>
-                            <option value="maintenance" ${status === 'maintenance' ? 'selected' : ''}>🟡 Under Maintenance</option>
-                            <option value="not_working" ${status === 'not_working' ? 'selected' : ''}>🔴 Not Working</option>
-                        </select>
-                        <input type="text" class="note-input" id="note-${app.id}" placeholder="Add a note (e.g. Technician called)..." value="${note}">
-                        <button class="btn-update" id="btn-${app.id}">Save</button>
-                    </div>
-                `;
+            floorDetails.appendChild(summary);
 
-                list.appendChild(li);
+            for (const [roomName, apps] of Object.entries(floorData.rooms)) {
+                const roomGroup = document.createElement('div');
+                roomGroup.className = 'room-group';
+                roomGroup.style.marginLeft = '15px';
+                roomGroup.style.marginTop = '15px';
 
-                // Add event listener after appending
-                setTimeout(() => {
-                    document.getElementById(`btn-${app.id}`).addEventListener('click', async (e) => {
-                        const btn = e.target;
-                        const newStatus = document.getElementById(`status-${app.id}`).value;
-                        const newNote = document.getElementById(`note-${app.id}`).value;
+                const title = document.createElement('h3');
+                title.className = 'room-title';
+                title.textContent = roomName;
+                title.style.fontSize = '16px';
+                title.style.borderBottom = '1px solid #ddd';
+                roomGroup.appendChild(title);
 
-                        if (window.Toast) window.Toast.show('Saving status...', 'info');
-                        btn.textContent = 'Saving...';
-                        btn.disabled = true;
+                const list = document.createElement('ul');
+                list.className = 'appliance-list';
 
-                        try {
-                            const issueRef = doc(db, "residences", residenceId, "issues", app.id);
+                apps.forEach(app => {
+                    const li = document.createElement('li');
+                    li.className = 'appliance-item';
 
-                            if (newStatus === 'working') {
-                                // Remove issue
-                                await deleteDoc(issueRef);
-                            } else {
+                    const issue = currentIssues[app.id];
+                    const status = issue ? issue.status || 'not_working' : 'working';
+                    const note = issue ? issue.description : '';
 
-                                // Add/Update issue
-                                await setDoc(issueRef, {
-                                    elementId: app.id,
-                                    elementName: niceName,
-                                    description: newNote || `Appliance is ${newStatus.replace('_', ' ')}`,
-                                    severity: newStatus === 'not_working' ? 'critical' : 'warning',
-                                    status: newStatus,
-                                    floorLevel: app.floorLevel,
-                                    roomName: app.roomName,
-                                    timestamp: new Date().toISOString()
-                                });
+                    const niceName = app.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
+                    li.innerHTML = `
+                        <div class="appliance-header">
+                            <span class="appliance-title">${niceName}</span>
+                            <span class="appliance-room">ID: ${app.id.split('_').pop()}</span>
+                        </div>
+                        <div class="appliance-controls">
+                            <select class="status-select" id="status-${app.id}">
+                                <option value="working" ${status === 'working' ? 'selected' : ''}>🟢 Working</option>
+                                <option value="maintenance" ${status === 'maintenance' ? 'selected' : ''}>🟡 Under Maintenance</option>
+                                <option value="not_working" ${status === 'not_working' ? 'selected' : ''}>🔴 Not Working</option>
+                            </select>
+                            <input type="text" class="note-input" id="note-${app.id}" placeholder="Add a note (e.g. Technician called)..." value="${note}">
+                            <button class="btn-update" id="btn-${app.id}">Save</button>
+                        </div>
+                    `;
+
+                    list.appendChild(li);
+
+                    // Add event listener after appending
+                    setTimeout(() => {
+                        document.getElementById(`btn-${app.id}`).addEventListener('click', async (e) => {
+                            const btn = e.target;
+                            const newStatus = document.getElementById(`status-${app.id}`).value;
+                            const newNote = document.getElementById(`note-${app.id}`).value;
+
+                            if (window.Toast) window.Toast.show('Saving status...', 'info');
+                            btn.textContent = 'Saving...';
+                            btn.disabled = true;
+
+                            try {
+                                const issueRef = doc(db, "residences", residenceId, "issues", app.id);
+
+                                if (newStatus === 'working') {
+                                    // Remove issue
+                                    await deleteDoc(issueRef);
+                                } else {
+                                    // Add/Update issue
+                                    await setDoc(issueRef, {
+                                        elementId: app.id,
+                                        elementName: niceName,
+                                        description: newNote || `Appliance is ${newStatus.replace('_', ' ')}`,
+                                        severity: newStatus === 'not_working' ? 'critical' : 'warning',
+                                        status: newStatus,
+                                        floorLevel: app.floorLevel,
+                                        roomName: app.roomName,
+                                        timestamp: new Date().toISOString()
+                                    });
+                                }
+
+                                if (window.Toast) window.Toast.show('Status saved successfully', 'success');
+                                btn.textContent = 'Saved!';
+                                btn.classList.add('saved');
+
+                                // Update issue count locally
+                                if (newStatus === 'working' && currentIssues[app.id]) {
+                                    delete currentIssues[app.id];
+                                    floorData.issuesCount--;
+                                } else if (newStatus !== 'working' && !currentIssues[app.id]) {
+                                    currentIssues[app.id] = { status: newStatus };
+                                    floorData.issuesCount++;
+                                }
+
+                                const newIssueText = floorData.issuesCount > 0 ? `<span style="color:red;">(${floorData.issuesCount} issues)</span>` : '<span style="color:green;">(All good)</span>';
+                                summary.innerHTML = `${floorName} ${newIssueText}`;
+
+                                setTimeout(() => {
+                                    btn.textContent = 'Save';
+                                    btn.classList.remove('saved');
+                                    btn.disabled = false;
+                                }, 2000);
+
+                            } catch (err) {
+                                console.error("Error saving status", err);
+                                if (window.Toast) window.Toast.show('Error saving status', 'error');
+                                btn.textContent = 'Error';
+                                setTimeout(() => {
+                                    btn.textContent = 'Save';
+                                    btn.disabled = false;
+                                }, 2000);
                             }
+                        });
+                    }, 0);
+                });
 
-                            if (window.Toast) window.Toast.show('Status saved successfully', 'success');
-                            btn.textContent = 'Saved!';
-                            btn.classList.add('saved');
-                            setTimeout(() => {
-                                btn.textContent = 'Save';
-                                btn.classList.remove('saved');
-                                btn.disabled = false;
-                            }, 2000);
-
-                        } catch (err) {
-                            console.error("Error saving status", err);
-                            if (window.Toast) window.Toast.show('Error saving status', 'error');
-                            btn.textContent = 'Error';
-                            setTimeout(() => {
-                                btn.textContent = 'Save';
-                                btn.disabled = false;
-                            }, 2000);
-                        }
-                    });
-                }, 0);
-            });
-
-            roomGroup.appendChild(list);
-            container.appendChild(roomGroup);
+                roomGroup.appendChild(list);
+                floorDetails.appendChild(roomGroup);
+            }
+            container.appendChild(floorDetails);
         }
-
     } catch (e) {
         console.error("Error loading appliances:", e);
         loading.textContent = "Error loading data. Please try again.";

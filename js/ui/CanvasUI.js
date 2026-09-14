@@ -125,6 +125,7 @@ class CanvasUI {
     bindEvents() {
         // Mouse Events
         this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
+        this.canvas.addEventListener('dblclick', this.onDblClick.bind(this));
         this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
         this.canvas.addEventListener('mouseleave', this.onMouseUp.bind(this));
@@ -695,6 +696,13 @@ class CanvasUI {
     }
 
     // --- Mouse Events ---
+
+    onDblClick(e) {
+        if (this.controller.currentTool === 'wall') {
+            this.tempWallStart = null;
+            this.render();
+        }
+    }
 
     onMouseDown(e) {
         if (e.button !== 0 && e.button !== 1) return;
