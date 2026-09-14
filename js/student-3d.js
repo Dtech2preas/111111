@@ -91,6 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let targetFloorLevel = 0;
+    const floorGroups = {};
+    let isDisplayingAllFloors = false;
     const floorHeight = 300; // units
     const wallsGroup = new THREE.Group();
     scene.add(wallsGroup);
@@ -386,7 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btnDisplayAll.innerText = 'Display All Floors';
     controlsGroup.appendChild(btnDisplayAll);
 
-    let isDisplayingAllFloors = false;
     btnDisplayAll.addEventListener('click', () => {
         isDisplayingAllFloors = !isDisplayingAllFloors;
         btnDisplayAll.innerText = isDisplayingAllFloors ? 'Hide All Floors' : 'Display All Floors';
@@ -647,8 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Building the 3D model
 
     // Floor groups dictionary
-    const floorGroups = {};
-
     function buildFloor(data, level) {
         data = window.safeParse(data);
         if (!data || !data.walls) return;
